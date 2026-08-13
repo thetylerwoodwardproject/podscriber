@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ script.topic }} — Generator — Podscriber{% endblock %}
+{% block content %}
+<a href="/generator" class="card-link" style="margin-bottom:18px">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+  All scripts
+</a>
+<h1 class="page-title" style="font-size:24px;margin-bottom:26px">{{ script.topic }}</h1>
+
+<div id="error-box" class="error-banner" style="display:{% if error_message %}block{% else %}none{% endif %};max-width:640px">
+  Something went wrong generating this script: <span id="error-message">{{ error_message or "" }}</span>. You can try again from the Generator page.
+</div>
+
+<div id="progress-box" style="display:{% if in_progress %}block{% else %}none{% endif %};max-width:640px">
+  <div class="progress-track"><div class="progress-fill" style="width:60%"></div></div>
+  <p class="page-sub" style="margin-top:14px">Writing your script — this can take a few minutes, especially on a local model.</p>
+</div>
+
+<div id="result-box" style="display:{% if script.script_text %}block{% else %}none{% endif %};max-width:720px">
+  {% if script.outline %}
+  <div class="card" style="cursor:default;margin-bottom:22px">
+    <div class="card-title" style="margin-bottom:10px">Outline</div>
+    <ol style="margin:0;padding-left:20px;color:var(--text);font-size:14px;line-height:1.8">
+      {% for beat in script.outline %}<li>{{ beat }}</li>{% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+
+  <div class="card" style="cursor:default">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="card-title">Script</div>
+      <button type="button" class="btn btn-outline" id="copy-script-btn">Copy</button>
+    </div>
+    <pre id="script-text" style="white-space:pre-wrap;font-family:'Public Sans',system-ui,sans-serif;font-size:14px;line-height:1.7;color:var(--text);margin:0">{{ script.script_text }}</pre>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.PODSCRIBER_SCRIPT_ID = {{ script.id }}; window.PODSCRIBER_IN_PROGRESS = {{ "true" if in_progress else "false" }};</script>
+<script src="{{ asset_url('js/generator.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,13 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+exclude = [".venv", "media"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's Depends()/Query()/etc. are designed to be used as function-call default arguments —
+# that's not the mutable-default-argument mistake B008 exists to catch.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body", "fastapi.Form"]

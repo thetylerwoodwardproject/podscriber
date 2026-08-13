@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ episode.title or episode.original_filename }} — Podscriber{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px">
+  <a href="/" style="background:none;border:none;color:var(--muted);font-size:13.5px;padding:0;cursor:pointer;display:flex;align-items:center;gap:5px;text-decoration:none">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+    All episodes
+  </a>
+  <form method="post" action="/episodes/{{ episode.id }}/delete"
+        onsubmit="return confirm('Delete this episode? This permanently removes its transcript, generated content, and audio file.');">
+    <button type="submit" style="background:none;border:none;color:var(--muted-light);font-size:13px;padding:0;cursor:pointer;text-decoration:underline">Delete episode</button>
+  </form>
+</div>
+
+<h1 class="page-title" style="font-size:27px;max-width:760px">{{ episode.title or episode.original_filename }}</h1>
+<div style="color:var(--muted-light);font-size:13.5px;margin-bottom:28px">
+  {{ episode.created_at.strftime("%b %-d, %Y") }} · {{ episode.duration_seconds | duration }} · Transcribed &amp; analyzed
+</div>
+
+{% if episode.status == 'error' %}
+<div class="error-banner" style="max-width:820px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+  <span>
+    Processing failed for this episode{% if last_error %}: <span style="font-family:ui-monospace,monospace;font-size:12.5px">{{ last_error.splitlines()[0] }}</span>{% endif %}.
+    Check your Settings (API keys, or whether Ollama/local Whisper are reachable) and retry.
+  </span>
+  <form method="post" action="/episodes/{{ episode.id }}/process" style="flex-shrink:0">
+    <button type="submit" class="btn btn-outline">Retry processing</button>
+  </form>
+</div>
+{% endif %}
+
+<div class="tabs">
+  {% for key, label in tabs %}
+  <a href="/episodes/{{ episode.id }}?tab={{ key }}" class="tab {% if key == active_tab %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+<select class="tab-select" onchange="window.location.href=this.value">
+  {% for key, label in tabs %}
+  <option value="/episodes/{{ episode.id }}?tab={{ key }}" {% if key == active_tab %}selected{% endif %}>{{ label }}</option>
+  {% endfor %}
+</select>
+
+{% if active_tab == 'titles' %}
+  {% include "results/titles.html" %}
+{% elif active_tab == 'description' %}
+  {% include "results/description.html" %}
+{% elif active_tab == 'social' %}
+  {% include "results/social.html" %}
+{% elif active_tab == 'keywords' %}
+  {% include "results/keywords.html" %}
+{% elif active_tab == 'chapters' %}
+  {% include "results/chapters.html" %}
+{% elif active_tab == 'soundbites' %}
+  {% include "results/soundbites.html" %}
+{% elif active_tab == 'transcript' %}
+  {% include "results/transcript.html" %}
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script src="{{ asset_url('js/soundbites.js') }}"></script>
+{% endblock %}

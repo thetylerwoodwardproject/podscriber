@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Upload new episode — Podscriber{% endblock %}
+{% block content %}
+<h1 class="page-title" style="font-size:24px;margin-bottom:26px">Upload new episode</h1>
+
+<div class="dropzone" id="dropzone">
+  <div class="dropzone-icon">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"></path><path d="M5 20h14"></path></svg>
+  </div>
+  <div class="sora" style="font-size:16.5px">Drag &amp; drop your audio file</div>
+  <div style="color:var(--muted-light);font-size:13.5px">MP3, WAV or M4A — up to 500MB</div>
+  <button type="button" class="btn btn-outline" id="browse-btn" style="margin-top:6px">Browse files</button>
+  <input type="file" id="file-input" accept=".mp3,.wav,.m4a,audio/*" style="display:none">
+</div>
+
+<div id="error-box" class="error-banner" style="display:none;max-width:640px;margin-top:18px"></div>
+
+<div id="file-card" class="file-card" style="display:none">
+  <div class="file-icon">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+  </div>
+  <div style="flex:1;min-width:0">
+    <div id="file-name" style="font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+    <div id="file-meta" style="color:var(--muted-light);font-size:12.5px"></div>
+  </div>
+  <button id="start-processing-btn" class="btn btn-primary" disabled>Start processing</button>
+</div>
+
+<div id="steps-card" style="display:none;max-width:640px;margin-top:18px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div class="sora" style="font-size:14.5px">What should we generate?</div>
+    <label style="font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+      <input type="checkbox" id="steps-select-all" checked> Select all
+    </label>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <label style="font-size:13.5px;color:var(--muted-light);display:flex;align-items:center;gap:8px">
+      <input type="checkbox" checked disabled> {{ step_labels["transcribing"] }} (required)
+    </label>
+    {% for key, label in step_labels.items() if key != "transcribing" %}
+    <label style="font-size:13.5px;display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" class="step-checkbox" name="steps" value="{{ key }}" checked> {{ label }}
+    </label>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ asset_url('js/upload.js') }}"></script>
+{% endblock %}

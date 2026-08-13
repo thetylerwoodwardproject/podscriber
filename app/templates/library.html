@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Episodes — Podscriber{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Episodes</h1>
+    <p class="page-sub">Upload an episode and get titles, show notes, social posts and soundbites in minutes.</p>
+  </div>
+  <a href="/upload" class="btn btn-primary">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+    New Episode
+  </a>
+</div>
+
+{% if episodes %}
+<div class="grid">
+  {% for ep in episodes %}
+  <div class="card-wrap">
+    <a href="/episodes/{{ ep.id }}" class="card">
+      <div class="card-top">
+        <span class="badge badge-{{ ep.status }}">{{ ep.status | status_label }}</span>
+        <span class="card-date">{{ ep.created_at.strftime("%b %-d, %Y") }}</span>
+      </div>
+      <div class="card-title">{{ ep.title or ep.original_filename }}</div>
+      <div class="card-duration">{{ ep.duration_seconds | duration }}</div>
+      <div class="card-link">
+        View results
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+      </div>
+    </a>
+    <form method="post" action="/episodes/{{ ep.id }}/delete" class="card-delete-form"
+          onsubmit="return confirm('Delete this episode? This permanently removes its transcript, generated content, and audio file.');">
+      <button type="submit" class="card-delete-btn" title="Delete episode" aria-label="Delete episode">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"></path><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"></path><path d="M10 11v6M14 11v6"></path></svg>
+      </button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">No episodes yet. Upload your first one to get started.</div>
+{% endif %}
+{% endblock %}

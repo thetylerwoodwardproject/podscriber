@@ -1,0 +1,45 @@
+<div style="max-width:680px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">
+    <span style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Chapters</span>
+    <a href="/episodes/{{ episode.id }}/chapters.json" id="chapters-download-link" class="btn btn-outline" style="padding:7px 14px;font-size:13px;{{ '' if chapters else 'display:none' }}">Download Chapters (JSON)</a>
+  </div>
+
+  <div id="chapters-list" style="display:flex;flex-direction:column;gap:10px">
+    {% for ch in chapters %}
+    <div class="chapter-row" style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:12px;border:1px solid var(--border);background:var(--card-bg)">
+      <span style="font-family:ui-monospace,monospace;font-size:12.5px;color:var(--muted-light);flex-shrink:0;width:64px">
+        {{ "%02d:%02d:%02d" | format((ch.start_ms // 3600000), (ch.start_ms // 60000) % 60, (ch.start_ms // 1000) % 60) }}
+      </span>
+      <form method="post" action="/episodes/{{ episode.id }}/chapters/{{ ch.id }}/edit" style="flex:1;display:flex" class="chapter-edit-form" data-ajax data-ajax-on-success="custom">
+        <input type="text" name="title" value="{{ ch.title }}" onchange="this.form.requestSubmit()" style="flex:1;border:none;outline:none;background:none;font-weight:600;font-size:14.5px;color:var(--text);padding:0">
+      </form>
+      <form method="post" action="/episodes/{{ episode.id }}/chapters/{{ ch.id }}/delete" class="chapter-delete-form" data-ajax data-ajax-on-success="remove" data-ajax-remove=".chapter-row">
+        <button type="submit" class="icon-btn" title="Delete chapter">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>
+        </button>
+      </form>
+    </div>
+    {% else %}
+    <div class="empty-state">No chapters generated.</div>
+    {% endfor %}
+  </div>
+  <p style="margin-top:16px;color:var(--muted-light);font-size:12px;line-height:1.6">Exports in the Podcasting 2.0 JSON Chapters format, compatible with apps and directories that support the podcast namespace's chapters tag.</p>
+</div>
+<script>
+(function () {
+  var list = document.getElementById("chapters-list");
+  var downloadLink = document.getElementById("chapters-download-link");
+
+  list.addEventListener("ps:ajax-success", function (e) {
+    var form = e.target;
+    if (form.classList.contains("chapter-edit-form")) {
+      // If the title was submitted blank, the server keeps the previous title —
+      // reflect that back into the input rather than leaving it visually empty.
+      form.querySelector('input[name="title"]').value = e.detail.data.title;
+      PS.flashSaved(form.querySelector('input[name="title"]'));
+    } else if (form.classList.contains("chapter-delete-form")) {
+      if (!list.querySelector(".chapter-row")) downloadLink.style.display = "none";
+    }
+  });
+})();
+</script>

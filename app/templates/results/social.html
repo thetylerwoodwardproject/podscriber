@@ -1,0 +1,78 @@
+<div style="max-width:1080px">
+  <div style="max-width:680px;margin-bottom:28px;padding:18px;border:1px solid var(--border);border-radius:14px;background:var(--card-bg)">
+    <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Regenerate with a tone</div>
+    <form id="social-regen-form" data-episode-id="{{ episode.id }}" method="post" action="/episodes/{{ episode.id }}/social/regenerate">
+      <label class="field-label" style="margin-top:0">Tone</label>
+      <select name="tone" id="social-tone-select" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--input-bg);color:var(--text)">
+        {% for value, label in social_tones %}
+        <option value="{{ value }}" {% if value == 'casual' %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <p style="margin:8px 0 0;color:var(--muted-light);font-size:12px">
+        Want more control over style? Set <a href="/settings#text-provider-radios">custom instructions</a> in Settings — they apply to titles, show notes, social posts, soundbites, and chapters for every episode.
+      </p>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
+        <button type="submit" id="social-regen-submit" class="btn btn-primary">Regenerate</button>
+        <span id="social-regen-status" style="display:none;align-items:center;gap:8px;font-size:13px;color:var(--muted)">
+          <span id="social-regen-spinner" style="display:none;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></span>
+          <span id="social-regen-status-text"></span>
+        </span>
+      </div>
+    </form>
+  </div>
+
+  <div id="social-posts-grid">
+    {% include "results/_social_posts_grid.html" %}
+  </div>
+</div>
+<script>
+(function () {
+  var form = document.getElementById("social-regen-form");
+  var episodeId = form.getAttribute("data-episode-id");
+  var regenBtn = document.getElementById("social-regen-submit");
+  var regenStatus = document.getElementById("social-regen-status");
+  var regenSpinner = document.getElementById("social-regen-spinner");
+  var regenStatusText = document.getElementById("social-regen-status-text");
+  var postsGrid = document.getElementById("social-posts-grid");
+  var base = "/episodes/" + episodeId;
+
+  function showStatus(text, spinning) {
+    regenStatusText.textContent = text;
+    regenSpinner.style.display = spinning ? "inline-block" : "none";
+    regenStatus.style.display = "inline-flex";
+  }
+  function hideStatus() {
+    regenStatus.style.display = "none";
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    regenBtn.disabled = true;
+    showStatus("Regenerating…", true);
+
+    fetch(base + "/social/regenerate", { method: "POST", body: new FormData(form) })
+      .then(function (r) { return r.json(); })
+      .then(function () {
+        var source = new EventSource(base + "/social/regenerate/status/stream");
+        source.onmessage = function (evt) {
+          var payload = JSON.parse(evt.data);
+          if (payload.status === "done") {
+            source.close();
+            fetch(base + "/social/posts-fragment")
+              .then(function (r) { return r.text(); })
+              .then(function (html) {
+                postsGrid.innerHTML = html;
+                hideStatus();
+                regenBtn.disabled = false;
+              });
+          } else if (payload.status === "error") {
+            source.close();
+            showStatus("Couldn't regenerate — check your text-generation provider in Settings and try again.", false);
+            regenBtn.disabled = false;
+          }
+        };
+      });
+  });
+})();
+</script>

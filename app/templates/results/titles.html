@@ -1,0 +1,33 @@
+{% set best_score = (content.titles | map(attribute='score') | list) | max if content and content.titles else 0 %}
+<div style="display:flex;flex-direction:column;gap:12px;max-width:680px">
+  {% for t in (content.titles if content else []) %}
+  {% set is_selected = loop.index0 == (content.selected_title_index if content else -1) %}
+  {% set is_best = t.score == best_score %}
+  <div class="title-row {{ 'selected' if is_selected }}" data-index="{{ loop.index0 }}">
+    <form method="post" action="/episodes/{{ episode.id }}/titles/select" style="display:contents" class="title-select-form" data-ajax data-ajax-on-success="custom">
+      <input type="hidden" name="index" value="{{ loop.index0 }}">
+      <button type="submit" class="title-select-btn {{ 'selected' if is_selected }}"></button>
+    </form>
+    <form method="post" action="/episodes/{{ episode.id }}/titles/{{ loop.index0 }}/edit" style="flex:1;display:flex;align-items:center;gap:14px" data-ajax data-ajax-flash-target="input[name=text]">
+      <input type="text" name="text" value="{{ t.text }}" class="sora" style="flex:1;border:none;outline:none;background:none;font-weight:600;font-size:15.5px;color:var(--text);padding:0" onchange="this.form.requestSubmit()">
+      <span style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;flex-shrink:0;background:{{ 'var(--accent-soft)' if is_best else 'var(--faint)' }};color:{{ 'var(--accent)' if is_best else 'var(--muted)' }}">
+        {% if is_best %}★{% endif %} {{ t.score }}
+      </span>
+    </form>
+  </div>
+  {% else %}
+  <div class="empty-state">No titles generated.</div>
+  {% endfor %}
+</div>
+<script>
+document.querySelectorAll(".title-select-form").forEach(function (form) {
+  form.addEventListener("ps:ajax-success", function () {
+    var selectedRow = form.closest(".title-row");
+    document.querySelectorAll(".title-row").forEach(function (row) {
+      var isSelected = row === selectedRow;
+      row.classList.toggle("selected", isSelected);
+      row.querySelector(".title-select-btn").classList.toggle("selected", isSelected);
+    });
+  });
+});
+</script>

@@ -1,0 +1,167 @@
+<div class="stats-section">
+  <div class="stats-section-header">
+    <span class="stats-section-title">Directory metadata</span>
+  </div>
+  <p class="stats-section-sub">via PodcastIndex.org</p>
+
+  {% if pi.state == 'not_configured' %}
+  <div class="empty-state">
+    Add your PodcastIndex API key, secret, and feed URL in <a href="/settings#podcast-index">Settings</a> to see your show's directory metadata here.
+  </div>
+  {% elif pi.state == 'feed_not_found' %}
+  <div class="empty-state">
+    PodcastIndex doesn't have a feed matching the URL in <a href="/settings#podcast-index">Settings</a> yet.
+    If your show is new, you can <a href="https://podcastindex.org/add" target="_blank" rel="noopener">submit it to the directory</a> — this will recheck automatically.
+  </div>
+  {% elif pi.state == 'error' %}
+  <div class="error-banner">Couldn't reach PodcastIndex.org right now. Try refreshing in a bit.</div>
+  {% elif pi.state == 'ok' %}
+  <div class="card" style="cursor:default;flex-direction:row;align-items:center;gap:18px;max-width:640px">
+    {% if pi.feed.artwork_url %}
+    <img src="{{ pi.feed.artwork_url }}" alt="" style="width:72px;height:72px;border-radius:12px;object-fit:cover;flex-shrink:0">
+    {% endif %}
+    <div style="min-width:0">
+      <div class="card-title">{{ pi.feed.title }}</div>
+      <div class="card-duration">{{ pi.feed.author }}</div>
+      {% if pi.feed.link %}<a href="{{ pi.feed.link }}" target="_blank" rel="noopener" class="card-link" style="margin-top:6px">Visit show site
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+      </a>{% endif %}
+    </div>
+  </div>
+
+  <div class="stat-tile-grid" style="max-width:640px">
+    <div class="stat-tile">
+      <div class="stat-tile-label">Episodes indexed</div>
+      <div class="stat-tile-value">{{ pi.feed.episode_count }}</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-tile-label">Value4Value</div>
+      <div class="stat-tile-value" style="font-size:16px">{{ 'Enabled' if pi.feed.value_enabled else 'Not set up' }}</div>
+    </div>
+  </div>
+
+  {% if pi.feed.categories %}
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+    {% for c in pi.feed.categories %}<span class="tag-pill">{{ c }}</span>{% endfor %}
+  </div>
+  {% endif %}
+
+  <p class="stats-caption">
+    As of {{ pi.fetched_at.strftime("%b %-d, %Y %-I:%M %p") }}
+    {% if pi.stale %}<span class="stats-stale-badge">Stale</span>{% endif %}
+  </p>
+  {% endif %}
+</div>
+
+<div class="stats-section">
+  <div class="stats-section-header">
+    <span class="stats-section-title">Episode details</span>
+  </div>
+  <p class="stats-section-sub">via PodcastIndex.org, joined with OP3 downloads where matched by title</p>
+
+  {% if pi_episodes.state == 'not_configured' %}
+  <div class="empty-state">
+    Configure PodcastIndex above to see per-episode duration and publish date here.
+  </div>
+  {% elif pi_episodes.state == 'error' %}
+  <div class="error-banner">Couldn't reach PodcastIndex.org right now. Try refreshing in a bit.</div>
+  {% elif pi_episodes.state == 'ok' %}
+  <div id="stats-duration-chart" data-bars="{{ pi_episodes.duration_histogram | tojson }}" data-title="Episodes"></div>
+
+  <table class="stats-table">
+    <thead>
+      <tr>
+        <th>Episode</th>
+        <th>Published</th>
+        <th class="num">Duration</th>
+        <th class="num">30-day downloads</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ep in pi_episodes.rows %}
+      <tr>
+        <td>{{ ep.title }}</td>
+        <td>{{ ep.pub_date or "—" }}</td>
+        <td class="num">{{ ep.duration_seconds | duration }}</td>
+        <td class="num">{{ "{:,}".format(ep.downloads_30) if ep.downloads_30 is not none else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="stats-caption">
+    As of {{ pi_episodes.fetched_at.strftime("%b %-d, %Y %-I:%M %p") }}
+    {% if pi_episodes.stale %}<span class="stats-stale-badge">Stale</span>{% endif %}
+  </p>
+  {% endif %}
+</div>
+
+<div class="stats-section">
+  <div class="stats-section-header">
+    <span class="stats-section-title">Download analytics</span>
+  </div>
+  <p class="stats-section-sub">via OP3.dev</p>
+
+  {% if op3.state == 'not_configured' %}
+  <div class="empty-state">
+    Add your OP3 API key in <a href="/settings#op3">Settings</a>, along with your PodcastIndex feed URL above, to see download analytics here.
+  </div>
+  {% elif op3.state == 'not_enabled' %}
+  <div class="stats-onboarding">
+    <p style="margin:0 0 8px;font-weight:600">OP3 hasn't seen any downloads for this show yet.</p>
+    <p style="margin:0 0 4px;color:var(--muted);font-size:13.5px;line-height:1.6">
+      OP3 is a free, open-source download tracker. It only has data for episodes whose enclosure URLs are routed through an OP3 redirect —
+      this is set up on your podcast hosting platform, not in Podscriber. Prefix your enclosure URLs with:
+    </p>
+    <code>{{ op3.prefix_example }}&lt;your original enclosure URL&gt;</code>
+    <p style="margin:8px 0 0;color:var(--muted);font-size:13.5px;line-height:1.6">
+      There's no historical backfill — downloads will start appearing here after your next episode goes out through the new URLs.
+      See <a href="https://op3.dev/setup" target="_blank" rel="noopener">op3.dev/setup</a> for platform-specific instructions.
+    </p>
+  </div>
+  {% elif op3.state == 'error' %}
+  <div class="error-banner">Couldn't reach OP3.dev right now. Try refreshing in a bit.</div>
+  {% elif op3.state == 'ok' %}
+  <div class="stat-tile-grid" style="max-width:640px">
+    <div class="stat-tile">
+      <div class="stat-tile-label">Downloads (30d)</div>
+      <div class="stat-tile-value">{{ "{:,}".format(op3.downloads.monthly_downloads) }}</div>
+    </div>
+    <div class="stat-tile">
+      <div class="stat-tile-label">Weekly average</div>
+      <div class="stat-tile-value">{{ "{:,}".format(op3.downloads.weekly_avg_downloads | round | int) }}</div>
+    </div>
+  </div>
+
+  <div id="stats-weekly-chart" data-weekly-bars="{{ op3.weekly_bars | tojson }}"></div>
+
+  {% if op3.top_episodes %}
+  <div id="stats-top-episodes-chart" data-episodes="{{ op3.top_episodes | tojson }}"></div>
+
+  <table class="stats-table">
+    <thead>
+      <tr>
+        <th>Episode</th>
+        <th class="num">7-day</th>
+        <th class="num">30-day</th>
+        <th class="num">All-time</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ep in op3.top_episodes %}
+      <tr>
+        <td>{{ ep.title }}</td>
+        <td class="num">{{ "{:,}".format(ep.downloads_7) }}</td>
+        <td class="num">{{ "{:,}".format(ep.downloads_30) }}</td>
+        <td class="num">{{ "{:,}".format(ep.downloads_all) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <p class="stats-caption">
+    As of {{ op3.downloads.as_of }}
+    {% if op3.stale %}<span class="stats-stale-badge">Stale</span>{% endif %}
+  </p>
+  {% endif %}
+</div>

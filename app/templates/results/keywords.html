@@ -1,0 +1,78 @@
+<div style="max-width:680px">
+  <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:14px">Suggested keywords &amp; tags</div>
+  <div id="keywords-list" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px">
+    {% for kw in (content.keywords if content else []) %}
+    <span class="chip keyword-chip">
+      {{ kw }}
+      <form method="post" action="/episodes/{{ episode.id }}/keywords/{{ loop.index0 }}/remove" style="display:inline;margin:0" class="keyword-remove-form" data-ajax data-ajax-on-success="custom">
+        <button type="submit" title="Remove">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </form>
+    </span>
+    {% else %}
+    <div class="empty-state">No keywords yet.</div>
+    {% endfor %}
+  </div>
+  <form method="post" action="/episodes/{{ episode.id }}/keywords/add" id="keyword-add-form" data-ajax data-ajax-on-success="custom" style="display:flex;gap:10px;align-items:center">
+    <input type="text" name="text" id="keyword-add-input" placeholder="Add a keyword…" style="flex:1">
+    <button type="submit" class="btn btn-outline">Add</button>
+  </form>
+</div>
+<script>
+(function () {
+  var episodeId = {{ episode.id }};
+  var list = document.getElementById("keywords-list");
+
+  function chipMarkup() {
+    return '<button type="submit" title="Remove">' +
+      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>' +
+      '</button>';
+  }
+
+  // Chip removal forms are keyed by array index server-side; after any removal the
+  // remaining chips' indices shift, so re-derive each form's action from its live
+  // position in the DOM rather than trusting the index baked in at render time.
+  function renumberChips() {
+    list.querySelectorAll(".keyword-chip").forEach(function (chip, i) {
+      var form = chip.querySelector("form");
+      form.action = "/episodes/" + episodeId + "/keywords/" + i + "/remove";
+    });
+  }
+
+  list.addEventListener("ps:ajax-success", function (e) {
+    var form = e.target;
+    if (!form.classList.contains("keyword-remove-form")) return;
+    var chip = form.closest(".keyword-chip");
+    if (chip) chip.remove();
+    if (!list.querySelector(".keyword-chip")) {
+      list.innerHTML = '<div class="empty-state">No keywords yet.</div>';
+    } else {
+      renumberChips();
+    }
+  });
+
+  document.getElementById("keyword-add-form").addEventListener("ps:ajax-success", function (e) {
+    var data = e.detail.data;
+    if (!data || !data.ok) return;
+    var emptyState = list.querySelector(".empty-state");
+    if (emptyState) emptyState.remove();
+    var chip = document.createElement("span");
+    chip.className = "chip keyword-chip";
+    chip.appendChild(document.createTextNode(data.text + " "));
+    var form = document.createElement("form");
+    form.method = "post";
+    form.style.cssText = "display:inline;margin:0";
+    form.className = "keyword-remove-form";
+    form.setAttribute("data-ajax", "");
+    form.setAttribute("data-ajax-on-success", "custom");
+    form.innerHTML = chipMarkup();
+    chip.appendChild(form);
+    list.appendChild(chip);
+    renumberChips();
+    var input = document.getElementById("keyword-add-input");
+    input.value = "";
+    input.focus();
+  });
+})();
+</script>

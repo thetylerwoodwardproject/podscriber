@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Settings — Podscriber{% endblock %}
+{% block content %}
+<h1 class="page-title" style="font-size:24px">Settings</h1>
+<p class="page-sub" style="margin-bottom:30px">Choose how transcription and content generation run, and connect the services Podscriber uses to fetch listener stats and podcast metadata.</p>
+
+<form method="post" action="/settings" data-ajax>
+
+  <div class="settings-card">
+    <div class="settings-card-header">
+      <span class="sora" style="font-size:15.5px">Text generation</span>
+      <span class="status-pill {% if s.text_provider == 'claude' and s.claude_api_key %}status-connected{% elif s.text_provider == 'openai' and s.openai_api_key %}status-connected{% elif s.text_provider == 'ollama' and ollama_reachable %}status-connected{% else %}status-not-connected{% endif %}">
+        {% if s.text_provider == 'claude' %}{{ 'Connected' if s.claude_api_key else 'Not connected' }}{% elif s.text_provider == 'openai' %}{{ 'Connected' if s.openai_api_key else 'Not connected' }}{% else %}{{ 'Reachable' if ollama_reachable else 'Not reachable' }}{% endif %}
+      </span>
+    </div>
+    <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Powers title, description, social post, keyword and soundbite generation. Choose Claude or OpenAI for best quality, or a local Ollama model to run fully offline for free.</p>
+
+    <label class="field-label">Provider</label>
+    <div id="text-provider-radios">
+      <label style="display:block;margin-bottom:6px"><input type="radio" name="text_provider" value="claude" {% if s.text_provider == 'claude' %}checked{% endif %}> Claude API</label>
+      <label style="display:block;margin-bottom:6px"><input type="radio" name="text_provider" value="openai" {% if s.text_provider == 'openai' %}checked{% endif %}> OpenAI</label>
+      <label style="display:block;margin-bottom:10px"><input type="radio" name="text_provider" value="ollama" {% if s.text_provider == 'ollama' %}checked{% endif %}> Local (Ollama)</label>
+    </div>
+
+    <label class="field-label">Claude API Key</label>
+    <input type="password" name="claude_api_key" value="{{ s.claude_api_key }}" placeholder="sk-ant-••••••••••••" style="width:100%">
+    <label class="field-label">Claude model</label>
+    <select name="claude_model" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--input-bg);color:var(--text)">
+      <option value="claude-haiku-4-5" {% if s.claude_model == 'claude-haiku-4-5' %}selected{% endif %}>Claude Haiku 4.5 — fastest, cheapest</option>
+      <option value="claude-sonnet-5" {% if s.claude_model == 'claude-sonnet-5' %}selected{% endif %}>Claude Sonnet 5 — balanced (recommended)</option>
+      <option value="claude-opus-5" {% if s.claude_model == 'claude-opus-5' %}selected{% endif %}>Claude Opus 5 — best quality</option>
+    </select>
+
+    <div id="text-openai-fields">
+      <label class="field-label">OpenAI API Key</label>
+      <input type="password" id="openai_api_key" name="openai_api_key" value="{{ s.openai_api_key }}" placeholder="sk-••••••••••••" style="width:100%">
+      <label class="field-label">OpenAI model</label>
+      <select name="openai_model" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--input-bg);color:var(--text)">
+        <option value="gpt-5-nano" {% if s.openai_model == 'gpt-5-nano' %}selected{% endif %}>GPT-5 nano — fastest, cheapest</option>
+        <option value="gpt-5-mini" {% if s.openai_model == 'gpt-5-mini' %}selected{% endif %}>GPT-5 mini — balanced (recommended)</option>
+        <option value="gpt-5" {% if s.openai_model == 'gpt-5' %}selected{% endif %}>GPT-5 — best quality</option>
+      </select>
+    </div>
+
+    <label class="field-label">Ollama model</label>
+    <input type="text" name="ollama_model" value="{{ s.ollama_model }}" placeholder="qwen3:4b-instruct" style="width:100%">
+    <p style="margin:6px 0 0;color:var(--muted-light);font-size:12px">Ollama at localhost:11434 is currently {{ 'reachable' if ollama_reachable else 'not reachable' }}.</p>
+
+    <label class="field-label">Custom instructions</label>
+    <textarea name="custom_instructions" rows="4" placeholder="e.g. Write like a sports commentator, keep social posts under 200 characters, always include a question.">{{ s.custom_instructions }}</textarea>
+    <p style="margin:6px 0 0;color:var(--muted-light);font-size:12px">Applied to every AI generation step for every episode — titles, show notes, social posts, soundbites, and chapters.</p>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-card-header">
+      <span class="sora" style="font-size:15.5px">Transcription</span>
+      <span class="status-pill {% if s.transcription_provider == 'openai' and s.whisper_api_key %}status-connected{% elif s.transcription_provider == 'local' %}status-connected{% else %}status-not-connected{% endif %}">
+        {% if s.transcription_provider == 'local' %}Configured{% else %}{{ 'Connected' if s.whisper_api_key else 'Not connected' }}{% endif %}
+      </span>
+    </div>
+    <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Transcribes uploaded audio before any content is generated.</p>
+
+    <label class="field-label">Provider</label>
+    <label style="display:block;margin-bottom:6px"><input type="radio" name="transcription_provider" value="local" {% if s.transcription_provider == 'local' %}checked{% endif %}> Local Whisper (faster-whisper, offline)</label>
+    <label style="display:block;margin-bottom:10px"><input type="radio" name="transcription_provider" value="openai" {% if s.transcription_provider == 'openai' %}checked{% endif %}> OpenAI Whisper API</label>
+
+    <label class="field-label">Local Whisper model size</label>
+    <select name="local_whisper_model_size" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--input-bg);color:var(--text)">
+      <option value="tiny" {% if s.local_whisper_model_size == 'tiny' %}selected{% endif %}>tiny — fastest, least accurate</option>
+      <option value="base" {% if s.local_whisper_model_size == 'base' %}selected{% endif %}>base</option>
+      <option value="small" {% if s.local_whisper_model_size == 'small' %}selected{% endif %}>small — recommended</option>
+      <option value="medium" {% if s.local_whisper_model_size == 'medium' %}selected{% endif %}>medium — slower, more accurate</option>
+    </select>
+
+    <label class="field-label">OpenAI Whisper API Key</label>
+    <input type="password" id="whisper_api_key" name="whisper_api_key" value="{{ s.whisper_api_key }}" placeholder="sk-••••••••••••" style="width:100%">
+    <label style="display:block;margin:8px 0 0;font-size:13px">
+      <input type="checkbox" id="openai-share-key" name="openai_share_key" value="1" {% if s.openai_share_key == 'true' %}checked{% endif %}> Also use this key for text generation
+    </label>
+  </div>
+
+  <div class="settings-card" id="podcast-index">
+    <div class="settings-card-header">
+      <span class="sora" style="font-size:15.5px">Podcast Index API</span>
+      <span class="status-pill {% if s.podcast_index_api_key and s.podcast_index_api_secret %}status-connected{% else %}status-not-connected{% endif %}">{{ 'Connected' if s.podcast_index_api_key and s.podcast_index_api_secret else 'Not connected' }}</span>
+    </div>
+    <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Used to pull episode metadata and cross-directory stats.</p>
+    <label class="field-label">API Key</label>
+    <input type="text" name="podcast_index_api_key" value="{{ s.podcast_index_api_key }}" placeholder="e.g. AB1CD2EF3GH" style="width:100%">
+    <label class="field-label">API Secret</label>
+    <input type="password" name="podcast_index_api_secret" value="{{ s.podcast_index_api_secret }}" placeholder="••••••••••••" style="width:100%">
+    <label class="field-label">Podcast Feed URL</label>
+    <input type="url" name="podcast_feed_url" value="{{ s.podcast_feed_url }}" placeholder="https://feeds.example.com/show.xml" style="width:100%">
+    <p style="margin:6px 0 0;color:var(--muted-light);font-size:12px">
+      Your show's public RSS feed — used to look up metadata on PodcastIndex.org for the Analytics page.
+      {% if s.podcast_index_feed_id %}Resolved feed ID: {{ s.podcast_index_feed_id }}.{% endif %}
+    </p>
+  </div>
+
+  <div class="settings-card" id="op3">
+    <div class="settings-card-header">
+      <span class="sora" style="font-size:15.5px">OP3 API</span>
+      <span class="status-pill {% if s.op3_api_key %}status-connected{% else %}status-not-connected{% endif %}">{{ 'Connected' if s.op3_api_key else 'Not connected' }}</span>
+    </div>
+    <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Used to pull open, privacy-preserving download &amp; listen analytics.</p>
+    <label class="field-label">API Key</label>
+    <input type="password" name="op3_api_key" value="{{ s.op3_api_key }}" placeholder="••••••••••••" style="width:100%">
+  </div>
+
+  <div class="settings-card" id="generator">
+    <div class="settings-card-header">
+      <span class="sora" style="font-size:15.5px">Script Generator</span>
+    </div>
+    <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Applied to every script the Generator writes, so scripts stay consistent with your show's voice — separate from the custom instructions above, which only apply to per-episode content.</p>
+    <label class="field-label">Generator tone instructions</label>
+    <textarea name="generator_custom_instructions" rows="4" placeholder="e.g. Open with a cold-open hook before any intro music cue, write in second person, close every episode with a call to action.">{{ s.generator_custom_instructions }}</textarea>
+  </div>
+
+  <div style="display:flex;gap:10px;align-items:center;margin-top:26px">
+    <button type="submit" class="btn btn-primary">Save settings</button>
+  </div>
+</form>
+
+<p style="max-width:560px;margin-top:20px;color:var(--muted-light);font-size:12px;line-height:1.6">API keys are stored locally in this app's SQLite database, unencrypted. This is a single-user local tool, so that's an intentional simplification — don't share this database file.</p>
+{% endblock %}
+{% block scripts %}
+<script src="{{ asset_url('js/settings.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% if row.suggestion %}
+{% if row.suggestion.used_transcript %}
+<span class="chip" style="margin-bottom:10px;display:inline-block">Based on full transcript</span>
+{% endif %}
+<div class="suggest-field">
+  <div class="suggest-field-header">
+    <span class="field-label" style="margin:0">Title</span>
+    <button type="button" class="icon-btn js-copy-btn" data-copy-target="title" title="Copy title">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 012-2h10"></path></svg>
+    </button>
+  </div>
+  <input type="text" class="js-suggested-title" value="{{ row.suggestion.suggested_title }}" readonly>
+</div>
+<div class="suggest-field">
+  <div class="suggest-field-header">
+    <span class="field-label" style="margin:0">Description</span>
+    <button type="button" class="icon-btn js-copy-btn" data-copy-target="description" title="Copy description">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 012-2h10"></path></svg>
+    </button>
+  </div>
+  <textarea class="js-suggested-description" rows="5" readonly>{{ row.suggestion.suggested_description }}</textarea>
+</div>
+{% if row.suggestion.suggested_keywords %}
+<div class="suggest-field">
+  <div class="suggest-field-header">
+    <span class="field-label" style="margin:0 0 8px">Target keywords</span>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:10px">
+    {% for kw in row.suggestion.suggested_keywords %}
+    <span class="chip">{{ kw }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+<p class="stats-caption">Generated {{ row.suggestion.generated_at.strftime("%b %-d, %Y %-I:%M %p") }}</p>
+<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
+  <button type="button" class="btn btn-outline js-suggest-btn" data-episode-key="{{ row.key }}">Regenerate</button>
+  <button type="button" class="btn btn-outline js-suggest-deep-btn" data-episode-key="{{ row.key }}">
+    {{ "Regenerate using transcript" if row.suggestion.used_transcript else "Suggest using transcript" }}
+  </button>
+  <span class="js-suggest-status" style="display:none;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)">
+    <span class="js-suggest-spinner" style="width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></span>
+    Generating…
+  </span>
+  <span class="js-suggest-deep-status" style="display:none;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)">
+    <span class="js-suggest-spinner" style="width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></span>
+    <span class="js-suggest-deep-step">Starting…</span>
+  </span>
+</div>
+{% else %}
+<div class="empty-state">No suggestion yet.</div>
+<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
+  <button type="button" class="btn btn-primary js-suggest-btn" data-episode-key="{{ row.key }}">Suggest improvements</button>
+  <button type="button" class="btn btn-outline js-suggest-deep-btn" data-episode-key="{{ row.key }}">Suggest using transcript</button>
+  <span class="js-suggest-status" style="display:none;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)">
+    <span class="js-suggest-spinner" style="width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></span>
+    Generating…
+  </span>
+  <span class="js-suggest-deep-status" style="display:none;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)">
+    <span class="js-suggest-spinner" style="width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></span>
+    <span class="js-suggest-deep-step">Starting…</span>
+  </span>
+</div>
+{% endif %}

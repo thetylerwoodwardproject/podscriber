@@ -1,0 +1,66 @@
+{% set desc = content.description if content else "" %}
+<div style="max-width:680px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+    <span style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Show notes</span>
+    <span style="font-size:12.5px;color:var(--muted-light)" id="description-char-count">{{ desc | length }} characters</span>
+  </div>
+  <form method="post" action="/episodes/{{ episode.id }}/description/edit" data-ajax data-ajax-flash-target="textarea">
+    <textarea name="text" id="description-edit-textarea" rows="11" onchange="this.form.requestSubmit()">{{ desc }}</textarea>
+  </form>
+  <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
+    <form method="post" action="/episodes/{{ episode.id }}/description/regenerate" id="description-regen-form">
+      <button type="submit" class="btn btn-outline">Regenerate</button>
+    </form>
+    <button type="button" class="btn btn-outline" id="copy-description-btn" style="display:flex;align-items:center;gap:6px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 012-2h10"></path></svg>
+      Copy
+    </button>
+  </div>
+</div>
+<script>
+document.getElementById("copy-description-btn").addEventListener("click", function () {
+  var textarea = document.querySelector('textarea[name="text"]');
+  PS.copyToClipboard(textarea);
+  var btn = this;
+  var original = btn.innerHTML;
+  btn.textContent = "Copied!";
+  setTimeout(function () { btn.innerHTML = original; }, 1500);
+});
+
+(function () {
+  var textarea = document.getElementById("description-edit-textarea");
+  var charCount = document.getElementById("description-char-count");
+  function updateCharCount() {
+    charCount.textContent = textarea.value.length + " characters";
+  }
+  textarea.addEventListener("input", updateCharCount);
+
+  var form = document.getElementById("description-regen-form");
+  var btn = form.querySelector("button[type=submit]");
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    PS.clearInlineError(form);
+    btn.disabled = true;
+    btn.textContent = "Regenerating…";
+    fetch(form.action, { method: "POST", body: new FormData(form) })
+      .then(function (res) {
+        return res.json().catch(function () { return null; }).then(function (data) {
+          if (!res.ok) throw new Error((data && data.detail) || "Regenerate failed");
+          return data;
+        });
+      })
+      .then(function (data) {
+        textarea.value = data.text;
+        updateCharCount();
+        PS.flashSaved(btn, "Regenerated");
+      })
+      .catch(function (err) {
+        PS.showInlineError(form, err.message);
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.textContent = "Regenerate";
+      });
+  });
+})();
+</script>

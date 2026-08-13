@@ -1,0 +1,28 @@
+<div style="display:flex;flex-direction:column;gap:14px;max-width:760px">
+  {% for sb in soundbites %}
+  <div class="soundbite-card">
+    <button class="play-btn" data-play-btn data-src="/media/uploads/{{ episode.id }}/clips/{{ sb.id }}.mp3" title="Play">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" data-play-icon><path d="M7 5.5v13a1 1 0 001.5.87l11-6.5a1 1 0 000-1.74l-11-6.5A1 1 0 007 5.5z"></path></svg>
+    </button>
+    <div class="soundbite-quote" style="flex:1;min-width:0">
+      <p style="margin:0 0 6px;font-size:14.5px;font-style:italic;line-height:1.5">"{{ sb.quote }}"</p>
+      <span style="font-size:12.5px;color:var(--muted-light);font-family:ui-monospace,monospace">{{ sb.start_ms | clock }} – {{ sb.end_ms | clock }}</span>
+    </div>
+    <form method="post" action="/episodes/{{ episode.id }}/soundbites/{{ sb.id }}/toggle-include" data-ajax data-ajax-on-success="set-class" data-ajax-set-target=".include-toggle" data-ajax-set-field="include" data-ajax-set-class="on">
+      <button type="submit" class="include-toggle {{ 'on' if sb.include else '' }}">
+        <span class="thumb"></span>
+      </button>
+    </form>
+    <a href="/episodes/{{ episode.id }}/soundbites/{{ sb.id }}/download" class="btn btn-outline" style="padding:7px 11px;font-size:12.5px">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6"></path><path d="M5 21h14"></path></svg>
+      Download
+    </a>
+    <a href="/episodes/{{ episode.id }}/soundbites/{{ sb.id }}/video" class="btn btn-outline" style="padding:7px 11px;font-size:12.5px">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="13" height="12" rx="2.5"></rect><path d="M15.5 10.2l5-3v9.6l-5-3z"></path></svg>
+      Create video
+    </a>
+  </div>
+  {% else %}
+  <div class="empty-state">No soundbites found for this episode.</div>
+  {% endfor %}
+</div>

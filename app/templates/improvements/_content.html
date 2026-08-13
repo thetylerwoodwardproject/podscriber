@@ -1,0 +1,42 @@
+{% if feed_state == 'not_configured' %}
+<div class="empty-state">
+  Add your PodcastIndex API key, secret, and feed URL in <a href="/settings#podcast-index">Settings</a>
+  to pull your back catalog and generate SEO-improved titles &amp; show notes here.
+</div>
+{% elif feed_state == 'feed_not_found' %}
+<div class="empty-state">
+  PodcastIndex doesn't have a feed matching the URL in <a href="/settings#podcast-index">Settings</a> yet.
+  If your show is new, you can <a href="https://podcastindex.org/add" target="_blank" rel="noopener">submit it to the directory</a> — this will recheck automatically.
+</div>
+{% elif feed_state == 'error' %}
+<div class="error-banner">Couldn't reach PodcastIndex.org right now. Try refreshing in a bit.</div>
+{% elif not rows %}
+<div class="empty-state">No episodes found in your feed yet.</div>
+{% else %}
+  <div class="improvement-list">
+  {% for row in rows %}
+  <div class="improvement-row" data-episode-key="{{ row.key }}">
+    <div class="improvement-col">
+      <div class="improvement-col-label">Original (from feed)</div>
+      <div class="improvement-title">{{ row.episode.title or "—" }}</div>
+      <div class="improvement-desc">{{ row.episode.description or "No original description available." }}</div>
+    </div>
+    <div class="improvement-arrow">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+    </div>
+    <div class="improvement-col improvement-col-ai">
+      <div class="improvement-col-label">SEO-suggested</div>
+      <div class="js-suggestion-col">
+        {% include "improvements/_suggestion_col.html" %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  </div>
+  {% if fetched_at %}
+  <p class="stats-caption">
+    Feed data as of {{ fetched_at.strftime("%b %-d, %Y %-I:%M %p") }}
+    {% if stale %}<span class="stats-stale-badge">Stale</span>{% endif %}
+  </p>
+  {% endif %}
+{% endif %}

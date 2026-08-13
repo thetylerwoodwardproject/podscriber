@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Generator — Podscriber{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Generator</h1>
+    <p class="page-sub">Write a full episode script from a topic and your research — outline first, then a word-by-word script in your show's voice.</p>
+  </div>
+</div>
+
+<form method="post" action="/generator/generate" class="card" style="cursor:default;max-width:640px;margin-bottom:36px">
+  <label class="field-label" style="margin-top:0">Topic / idea</label>
+  <input type="text" name="topic" required placeholder="e.g. Why most startups fail at pricing" style="width:100%">
+
+  <label class="field-label">Research notes</label>
+  <textarea name="research_text" rows="8" placeholder="Paste links, notes, quotes, or a rough outline of what you want covered."></textarea>
+
+  <p style="margin:10px 0 0;color:var(--muted-light);font-size:12px">
+    Every script also follows your <a href="/settings#generator">tone instructions</a> from Settings, and pulls style
+    context from your past processed episodes automatically.
+  </p>
+
+  <div style="margin-top:16px">
+    <button type="submit" class="btn btn-primary" id="generate-btn">Generate script</button>
+  </div>
+</form>
+
+<h2 class="sora" style="font-size:16px;margin-bottom:16px">Past scripts</h2>
+{% if scripts %}
+<div style="display:flex;flex-direction:column;gap:10px;max-width:640px">
+  {% for s in scripts %}
+  <a href="/generator/{{ s.id }}" class="card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;text-decoration:none;color:inherit">
+    <div style="min-width:0">
+      <div class="card-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.topic }}</div>
+      <div class="card-date">{{ s.created_at.strftime("%b %-d, %Y %-I:%M %p") }}</div>
+    </div>
+    {% if not s.script_text %}<span class="status-pill" style="background:var(--status-processing-bg);color:var(--status-processing-fg)">In progress</span>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">No scripts yet — generate your first one above.</div>
+{% endif %}
+{% endblock %}

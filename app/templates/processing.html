@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Processing — Podscriber{% endblock %}
+{% block content %}
+<h1 class="page-title" style="font-size:24px;margin-bottom:6px">Processing your episode</h1>
+<p class="page-sub" style="margin-bottom:30px">{{ episode.original_filename }}</p>
+
+<div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+
+<div id="error-box" class="error-banner" style="display:none;max-width:560px"></div>
+<div id="queue-box" class="page-sub" style="display:none;max-width:560px;margin-bottom:20px">Waiting in queue — another episode is currently processing. This will start automatically.</div>
+
+<div style="display:flex;flex-direction:column;gap:16px;max-width:560px" id="steps">
+  {% for step in steps %}
+  <div class="step-row" data-step="{{ step.key }}">
+    <div class="step-icon pending" data-icon>
+      <div class="pending-dot"></div>
+    </div>
+    <span class="step-label pending" data-label>{{ step.label }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>window.PODSCRIBER_EPISODE_ID = {{ episode.id }};</script>
+<script src="{{ asset_url('js/processing.js') }}"></script>
+{% endblock %}
