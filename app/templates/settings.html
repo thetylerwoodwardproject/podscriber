@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Settings — Podscriber{% endblock %}
+{% macro status_pill(connected, label) -%}
+<span class="status-pill {{ 'status-connected' if connected else 'status-not-connected' }}">{{ label }}</span>
+{%- endmacro %}
 {% block content %}
 <h1 class="page-title" style="font-size:24px">Settings</h1>
 <p class="page-sub" style="margin-bottom:30px">Choose how transcription and content generation run, and connect the services Podscriber uses to fetch listener stats and podcast metadata.</p>
@@ -9,9 +12,13 @@
   <div class="settings-card">
     <div class="settings-card-header">
       <span class="sora" style="font-size:15.5px">Text generation</span>
-      <span class="status-pill {% if s.text_provider == 'claude' and s.claude_api_key %}status-connected{% elif s.text_provider == 'openai' and s.openai_api_key %}status-connected{% elif s.text_provider == 'ollama' and ollama_reachable %}status-connected{% else %}status-not-connected{% endif %}">
-        {% if s.text_provider == 'claude' %}{{ 'Connected' if s.claude_api_key else 'Not connected' }}{% elif s.text_provider == 'openai' %}{{ 'Connected' if s.openai_api_key else 'Not connected' }}{% else %}{{ 'Reachable' if ollama_reachable else 'Not reachable' }}{% endif %}
-      </span>
+      {% if s.text_provider == 'claude' %}
+      {{ status_pill(s.claude_api_key, 'Connected' if s.claude_api_key else 'Not connected') }}
+      {% elif s.text_provider == 'openai' %}
+      {{ status_pill(s.openai_api_key, 'Connected' if s.openai_api_key else 'Not connected') }}
+      {% else %}
+      {{ status_pill(ollama_reachable, 'Reachable' if ollama_reachable else 'Not reachable') }}
+      {% endif %}
     </div>
     <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Powers title, description, social post, keyword and soundbite generation. Choose Claude or OpenAI for best quality, or a local Ollama model to run fully offline for free.</p>
 
@@ -78,9 +85,11 @@
   <div class="settings-card">
     <div class="settings-card-header">
       <span class="sora" style="font-size:15.5px">Transcription</span>
-      <span class="status-pill {% if s.transcription_provider == 'openai' and s.whisper_api_key %}status-connected{% elif s.transcription_provider == 'local' %}status-connected{% else %}status-not-connected{% endif %}">
-        {% if s.transcription_provider == 'local' %}Configured{% else %}{{ 'Connected' if s.whisper_api_key else 'Not connected' }}{% endif %}
-      </span>
+      {% if s.transcription_provider == 'local' %}
+      {{ status_pill(true, 'Configured') }}
+      {% else %}
+      {{ status_pill(s.whisper_api_key, 'Connected' if s.whisper_api_key else 'Not connected') }}
+      {% endif %}
     </div>
     <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Transcribes uploaded audio before any content is generated.</p>
 
@@ -106,7 +115,7 @@
   <div class="settings-card" id="podcast-index">
     <div class="settings-card-header">
       <span class="sora" style="font-size:15.5px">Podcast Index API</span>
-      <span class="status-pill {% if s.podcast_index_api_key and s.podcast_index_api_secret %}status-connected{% else %}status-not-connected{% endif %}">{{ 'Connected' if s.podcast_index_api_key and s.podcast_index_api_secret else 'Not connected' }}</span>
+      {{ status_pill(s.podcast_index_api_key and s.podcast_index_api_secret, 'Connected' if (s.podcast_index_api_key and s.podcast_index_api_secret) else 'Not connected') }}
     </div>
     <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Used to pull episode metadata and cross-directory stats.</p>
     <label class="field-label">API Key</label>
@@ -124,7 +133,7 @@
   <div class="settings-card" id="op3">
     <div class="settings-card-header">
       <span class="sora" style="font-size:15.5px">OP3 API</span>
-      <span class="status-pill {% if s.op3_api_key %}status-connected{% else %}status-not-connected{% endif %}">{{ 'Connected' if s.op3_api_key else 'Not connected' }}</span>
+      {{ status_pill(s.op3_api_key, 'Connected' if s.op3_api_key else 'Not connected') }}
     </div>
     <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Used to pull open, privacy-preserving download &amp; listen analytics.</p>
     <label class="field-label">API Key</label>

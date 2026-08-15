@@ -107,26 +107,22 @@
         });
       })
       .then(function (data) {
-        var source = new EventSource("/improvements/suggest-deep/status/stream?job_id=" + data.job_id);
-        source.onmessage = function (evt) {
-          var payload = JSON.parse(evt.data);
+        PS.streamStatus("/improvements/suggest-deep/status/stream?job_id=" + data.job_id, function (payload) {
           if (stepText && payload.status === "running" && payload.current_step) {
             stepText.textContent = deepStepLabels[payload.current_step] || payload.current_step;
           }
           if (payload.status === "done") {
-            source.close();
             fetch("/improvements/suggest-deep/result?key=" + encodeURIComponent(key))
               .then(function (r) { return r.text(); })
               .then(function (html) {
                 suggestionCol.innerHTML = html;
               });
           } else if (payload.status === "error") {
-            source.close();
             PS.showInlineError(col, payload.error_message || "Couldn't finish the job.");
             btn.disabled = false;
             if (status) status.style.display = "none";
           }
-        };
+        });
       })
       .catch(function (err) {
         PS.showInlineError(col, err.message);
@@ -165,15 +161,12 @@
     fetch("/improvements/generate-all", { method: "POST" })
       .then(function (r) { return r.json(); })
       .then(function () {
-        var source = new EventSource("/improvements/generate-all/status/stream");
-        source.onmessage = function (evt) {
-          var payload = JSON.parse(evt.data);
+        PS.streamStatus("/improvements/generate-all/status/stream", function (payload) {
           progressFill.style.width = (payload.progress_pct || 0) + "%";
           if (payload.status === "running" && payload.current_step) {
             statusText.textContent = "Suggesting " + payload.current_step;
           }
           if (payload.status === "done") {
-            source.close();
             statusText.textContent = "Done.";
             fetch("/improvements/rows-fragment")
               .then(function (r) { return r.text(); })
@@ -183,11 +176,10 @@
                 progressTrack.style.display = "none";
               });
           } else if (payload.status === "error") {
-            source.close();
             statusText.textContent = "Couldn't finish: " + (payload.error_message || "unknown error");
             generateAllBtn.disabled = false;
           }
-        };
+        });
       });
   });
 })();

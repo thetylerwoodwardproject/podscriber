@@ -14,7 +14,6 @@ from app.services import podcast_index, settings_store, stats_cache
 
 logger = logging.getLogger("podscriber.improvements")
 
-REFRESH_FLOOR = timedelta(seconds=60)
 PI_EPISODES_TTL = timedelta(hours=6)
 MAX_FEED_EPISODES = 1000
 CACHE_KEY = "podcast_index:episodes"
@@ -41,8 +40,7 @@ def load_feed_episodes(db: Session, s: dict, force: bool) -> dict:
         settings_store.set_many(db, saved)
 
     cached = stats_cache.get(db, CACHE_KEY)
-    should_fetch = cached is None or (force and stats_cache.is_stale(cached, REFRESH_FLOOR))
-    should_fetch = should_fetch or (cached is not None and stats_cache.is_stale(cached, PI_EPISODES_TTL))
+    should_fetch = stats_cache.should_refetch(cached, force, PI_EPISODES_TTL)
 
     if not should_fetch and cached is not None:
         if cached.ok:

@@ -1,23 +1,5 @@
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from app.db import Base
 from app.services import social_regen
 from app.services.llm.base import SocialGroup
-
-
-@pytest.fixture
-def db():
-    engine = create_engine("sqlite:///:memory:")
-    from app import models  # noqa: F401  (register models on Base.metadata)
-
-    Base.metadata.create_all(bind=engine)
-    session = sessionmaker(bind=engine)()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 def _make_episode(db):

@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.models import StatsCache, now_utc
 
+REFRESH_FLOOR = timedelta(seconds=60)
+
 
 def get(db: Session, key: str) -> StatsCache | None:
     return db.get(StatsCache, key)
@@ -14,6 +16,16 @@ def is_stale(row: StatsCache, max_age: timedelta) -> bool:
     # (expire_on_commit=True) comes back naive even though now_utc() stays aware.
     fetched_at = row.fetched_at if row.fetched_at.tzinfo else row.fetched_at.replace(tzinfo=UTC)
     return now_utc() - fetched_at > max_age
+
+
+def should_refetch(cached: StatsCache | None, force: bool, ttl: timedelta, floor: timedelta = REFRESH_FLOOR) -> bool:
+    """True if a cached row is missing, past its TTL, or force-refreshed and past the floor
+    (the floor keeps a "Refresh" button from re-hitting a rate-limited API on every click)."""
+    if cached is None:
+        return True
+    if force and is_stale(cached, floor):
+        return True
+    return is_stale(cached, ttl)
 
 
 def save(db: Session, key: str, payload: dict, ok: bool = True, error_message: str | None = None) -> StatsCache:

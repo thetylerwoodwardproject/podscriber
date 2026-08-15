@@ -206,6 +206,7 @@ textarea { width: 100%; box-sizing: border-box; resize: vertical; line-height: 1
 .settings-card + .settings-card { margin-top: 26px; }
 .settings-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .field-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; }
+.field-caption { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
 .field-subinput { width: 100%; box-sizing: border-box; margin-top: 8px; display: none; }
 .field-subinput.field-subinput-visible { display: block; }
 .status-pill { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; }
@@ -269,13 +270,6 @@ button.is-busy, .btn.is-busy { opacity: .6; cursor: progress; pointer-events: no
 .stats-chart .area-mark { fill: var(--accent); opacity: .1; }
 .stats-chart .line-mark { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .stats-chart .dot-mark { fill: var(--accent); stroke: var(--card-bg); stroke-width: 2; cursor: default; }
-.stats-range-toggle { display: flex; gap: 6px; margin-bottom: 14px; }
-.stats-range-toggle button {
-  border: 1px solid var(--border); background: var(--card-bg); color: var(--muted); border-radius: 999px;
-  padding: 5px 13px; font-size: 12.5px; font-weight: 600; cursor: pointer;
-}
-.stats-range-toggle button.active { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
-
 .stats-tooltip {
   position: fixed; pointer-events: none; background: var(--text); color: var(--bg); font-size: 12px;
   font-weight: 600; padding: 6px 10px; border-radius: 8px; white-space: nowrap; z-index: 100;
@@ -310,6 +304,8 @@ button.is-busy, .btn.is-busy { opacity: .6; cursor: progress; pointer-events: no
 .suggest-field textarea, .suggest-field input[type=text] { font-size: 13px; width: 100%; box-sizing: border-box; }
 .suggest-field textarea { resize: none; }
 .suggest-field .icon-btn { padding: 8px; }
+.suggest-status-row { display: none; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.spinner-sm { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
 .improvement-title { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 15.5px; line-height: 1.35; margin-bottom: 6px; }
 .improvement-desc { color: var(--muted); font-size: 13px; line-height: 1.55; white-space: pre-line; }
 .improvement-arrow { color: var(--muted-light); padding-top: 20px; }

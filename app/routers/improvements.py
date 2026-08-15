@@ -1,14 +1,11 @@
-import asyncio
-import json
-
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import SessionLocal, get_db
+from app.db import get_db
 from app.models import Episode, FeedEpisodeSuggestion, Job
-from app.routers._shared import recent_episodes
+from app.routers._shared import latest_job, recent_episodes, sse_job_stream
 from app.services import settings_store
 from app.services.feed_catalog import load_feed_episodes
 from app.services.feed_seo import episode_key, generate_suggestion_for_episode
@@ -188,35 +185,17 @@ async def suggest_feed_episode_deep(request: Request, db: Session = Depends(get_
 
 @router.get("/improvements/suggest-deep/status/stream")
 def suggest_deep_status_stream(job_id: int):
-    async def event_source():
-        # Async, not sync — see processing.py's status_stream for why a sync generator
-        # here would starve FastAPI's worker thread pool when the job status is idle.
-        last_payload = None
-        for _ in range(1200):  # ~10 min ceiling, matches the other status streams
-            # Open a fresh, short-lived session per poll instead of holding one for the
-            # whole loop — see the matching comment in processing.py's status_stream.
-            db = SessionLocal()
-            try:
-                job = db.get(Job, job_id)
-                if job is None:
-                    payload = {"status": "error", "current_step": None, "progress_pct": 0, "error_message": "Job not found"}
-                else:
-                    payload = {
-                        "status": job.status,
-                        "current_step": job.current_step,
-                        "progress_pct": job.progress_pct,
-                        "error_message": job.error_message,
-                    }
-            finally:
-                db.close()
-            if payload != last_payload:
-                yield f"data: {json.dumps(payload)}\n\n"
-                last_payload = payload
-            if job is None or job.status in ("done", "error"):
-                break
-            await asyncio.sleep(0.5)
-
-    return StreamingResponse(event_source(), media_type="text/event-stream")
+    return sse_job_stream(
+        query_fn=lambda db: db.get(Job, job_id),
+        payload_fn=lambda job: {
+            "status": job.status,
+            "current_step": job.current_step,
+            "progress_pct": job.progress_pct,
+            "error_message": job.error_message,
+        },
+        not_found_payload={"status": "error", "current_step": None, "progress_pct": 0, "error_message": "Job not found"},
+        not_found_terminal=True,
+    )
 
 
 @router.get("/improvements/suggest-deep/result", response_class=HTMLResponse)
@@ -241,36 +220,13 @@ def generate_all(db: Session = Depends(get_db)):
 
 @router.get("/improvements/generate-all/status/stream")
 def generate_all_status_stream():
-    def event_source():
-        db = SessionLocal()
-        try:
-            last_payload = None
-            for _ in range(1200):  # ~10 min ceiling, matches the video-export/social-regen status streams
-                # Release the read transaction so we see commits made by the background job
-                # thread's own session — see CLAUDE.md's SQLite cross-session polling gotcha.
-                db.commit()
-                job = db.execute(
-                    select(Job)
-                    .where(Job.job_type == "feed_seo_suggestions")
-                    .order_by(Job.created_at.desc())
-                    .limit(1)
-                ).scalar_one_or_none()
-                if job is None:
-                    payload = {"status": "pending", "current_step": None, "progress_pct": 0, "error_message": None}
-                else:
-                    payload = {
-                        "status": job.status,
-                        "current_step": job.current_step,
-                        "progress_pct": job.progress_pct,
-                        "error_message": job.error_message,
-                    }
-                if payload != last_payload:
-                    yield f"data: {json.dumps(payload)}\n\n"
-                    last_payload = payload
-                if job is not None and job.status in ("done", "error"):
-                    break
-                time.sleep(0.5)
-        finally:
-            db.close()
-
-    return StreamingResponse(event_source(), media_type="text/event-stream")
+    return sse_job_stream(
+        query_fn=lambda db: latest_job(db, "feed_seo_suggestions"),
+        payload_fn=lambda job: {
+            "status": job.status,
+            "current_step": job.current_step,
+            "progress_pct": job.progress_pct,
+            "error_message": job.error_message,
+        },
+        not_found_payload={"status": "pending", "current_step": None, "progress_pct": 0, "error_message": None},
+    )

@@ -18,17 +18,13 @@
   var errorBox = document.getElementById("error-box");
   var errorMessage = document.getElementById("error-message");
 
-  var source = new EventSource("/generator/" + scriptId + "/status/stream");
-  source.onmessage = function (evt) {
-    var payload = JSON.parse(evt.data);
+  PS.streamStatus("/generator/" + scriptId + "/status/stream", function (payload) {
     if (payload.status === "done") {
-      source.close();
       window.location.reload();
     } else if (payload.status === "error") {
-      source.close();
       progressBox.style.display = "none";
       errorMessage.textContent = payload.error_message || "unknown error";
       errorBox.style.display = "block";
     }
-  };
+  });
 })();

@@ -83,6 +83,22 @@ window.PS = window.PS || {};
     if (banner) banner.remove();
   };
 
+  // Opens an EventSource against a job-status stream (see app/routers/_shared.py's
+  // sse_job_stream), parses each message as JSON, and hands it to onPayload — closing the
+  // stream once the payload reports a terminal status. Returns the EventSource so callers
+  // can still attach onerror or close it early.
+  PS.streamStatus = function (url, onPayload) {
+    var source = new EventSource(url);
+    source.onmessage = function (evt) {
+      var payload = JSON.parse(evt.data);
+      onPayload(payload);
+      if (payload.status === "done" || payload.status === "error") {
+        source.close();
+      }
+    };
+    return source;
+  };
+
   document.addEventListener("submit", function (e) {
     var form = e.target;
     if (!(form instanceof HTMLFormElement) || !form.hasAttribute("data-ajax")) return;

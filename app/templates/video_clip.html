@@ -25,61 +25,11 @@
   </div>
 
   <div style="flex:1;min-width:260px;max-width:380px;display:flex;flex-direction:column;gap:24px">
-    <div>
-      <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Background image</div>
-      <input type="file" id="bg-file-input" accept="image/*" style="display:none">
-      <div style="display:flex;gap:10px">
-        <button type="button" class="btn btn-outline" id="upload-bg-btn">Upload image</button>
-        <button type="button" class="btn btn-outline" id="remove-bg-btn" style="{% if not clip.background_image_path %}display:none;{% endif %}">Remove</button>
-      </div>
-    </div>
-
-    <div>
-      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
-        <span>Brightness</span><span id="brightness-label" style="text-transform:none;color:var(--muted-light);font-weight:500">{{ (clip.brightness * 100) | round | int }}%</span>
-      </div>
-      <input type="range" min="0.4" max="1.6" step="0.01" value="{{ clip.brightness }}" id="brightness-input" style="width:100%">
-    </div>
-
-    <div>
-      <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Brand mark</div>
-      <input type="file" id="logo-file-input" accept="image/*" style="display:none">
-      <div style="display:flex;gap:10px">
-        <button type="button" class="btn btn-outline" id="upload-logo-btn">Upload logo</button>
-        <button type="button" class="btn btn-outline" id="remove-logo-btn" style="{% if not clip.logo_image_path %}display:none;{% endif %}">Use default</button>
-      </div>
-    </div>
-
-    <div>
-      <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Waveform color</div>
-      <div style="display:flex;align-items:center;gap:10px">
-        {% for sw in swatches %}
-        <button type="button" class="waveform-swatch" data-color="{{ sw }}" style="width:22px;height:22px;border-radius:50%;background:{{ sw }};border:2px solid {{ 'var(--accent)' if clip.waveform_color.lower() == sw.lower() else 'var(--border)' }};cursor:pointer;padding:0;flex-shrink:0"></button>
-        {% endfor %}
-        <input type="text" id="hex-input" value="{{ clip.waveform_color }}" placeholder="#e2572c" style="width:96px;font-family:ui-monospace,monospace;font-size:13px">
-      </div>
-      <p style="margin:10px 0 0;color:var(--muted-light);font-size:12.5px;line-height:1.5">Drag the waveform in the preview to reposition it vertically.</p>
-    </div>
-
-    <div>
-      <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Caption</div>
-      <textarea id="caption-input" rows="3">{{ clip.caption }}</textarea>
-    </div>
-
-    <div>
-      <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Download file name</div>
-      <input type="text" id="filename-input" value="{{ clip.download_filename or '' }}" placeholder="soundbite-{{ soundbite.id }}" style="width:100%">
-      <p style="margin:6px 0 0;color:var(--muted-light);font-size:12.5px;line-height:1.5">Used for the downloaded file. ".mp4" is added automatically.</p>
-    </div>
-
-    <button type="button" class="btn btn-primary" id="export-btn" style="justify-content:center">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6"></path><path d="M5 21h14"></path></svg>
-      Export vertical video
-    </button>
-    <div id="export-status" style="font-size:13px;color:var(--muted)"></div>
-    {% if clip.exported_video_path %}
-    <a href="/episodes/{{ episode.id }}/soundbites/{{ soundbite.id }}/video/download" class="btn btn-outline" style="justify-content:center">Download last export</a>
-    {% endif %}
+    {% set target = clip %}
+    {% set export_label = "Export vertical video" %}
+    {% set filename_placeholder = "soundbite-" ~ soundbite.id %}
+    {% set download_url = "/episodes/" ~ episode.id ~ "/soundbites/" ~ soundbite.id ~ "/video/download" %}
+    {% include "_video_editor_controls.html" %}
   </div>
 </div>
 {% endblock %}

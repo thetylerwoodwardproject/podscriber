@@ -1,25 +1,7 @@
 from datetime import timedelta
 
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from app.db import Base
 from app.models import now_utc
 from app.services import stats_cache
-
-
-@pytest.fixture
-def db():
-    engine = create_engine("sqlite:///:memory:")
-    from app import models  # noqa: F401  (register models on Base.metadata)
-
-    Base.metadata.create_all(bind=engine)
-    session = sessionmaker(bind=engine)()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 def test_get_missing_key_returns_none(db):

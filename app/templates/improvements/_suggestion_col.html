@@ -1,3 +1,13 @@
+{% macro suggest_status_spans() %}
+  <span class="js-suggest-status suggest-status-row">
+    <span class="spinner-sm"></span>
+    Generating…
+  </span>
+  <span class="js-suggest-deep-status suggest-status-row">
+    <span class="spinner-sm"></span>
+    <span class="js-suggest-deep-step">Starting…</span>
+  </span>
+{% endmacro %}
 {% if row.suggestion %}
 {% if row.suggestion.used_transcript %}
 <span class="chip" style="margin-bottom:10px;display:inline-block">Based on full transcript</span>
@@ -38,27 +48,13 @@
   <button type="button" class="btn btn-outline js-suggest-deep-btn" data-episode-key="{{ row.key }}">
     {{ "Regenerate using transcript" if row.suggestion.used_transcript else "Suggest using transcript" }}
   </button>
-  <span class="js-suggest-status" style="display:none;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)">
-    <span class="js-suggest-spinner" style="width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></span>
-    Generating…
-  </span>
-  <span class="js-suggest-deep-status" style="display:none;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)">
-    <span class="js-suggest-spinner" style="width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></span>
-    <span class="js-suggest-deep-step">Starting…</span>
-  </span>
+  {{ suggest_status_spans() }}
 </div>
 {% else %}
 <div class="empty-state">No suggestion yet.</div>
 <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
   <button type="button" class="btn btn-primary js-suggest-btn" data-episode-key="{{ row.key }}">Suggest improvements</button>
   <button type="button" class="btn btn-outline js-suggest-deep-btn" data-episode-key="{{ row.key }}">Suggest using transcript</button>
-  <span class="js-suggest-status" style="display:none;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)">
-    <span class="js-suggest-spinner" style="width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></span>
-    Generating…
-  </span>
-  <span class="js-suggest-deep-status" style="display:none;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)">
-    <span class="js-suggest-spinner" style="width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></span>
-    <span class="js-suggest-deep-step">Starting…</span>
-  </span>
+  {{ suggest_status_spans() }}
 </div>
 {% endif %}

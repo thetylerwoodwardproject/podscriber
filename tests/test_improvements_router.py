@@ -3,26 +3,11 @@ from datetime import timedelta
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select
 
-from app.db import Base
 from app.routers import improvements as improvements_router
 from app.services import feed_catalog, podcast_index, settings_store
 from app.services.llm.base import SeoSuggestion
-
-
-@pytest.fixture
-def db():
-    engine = create_engine("sqlite:///:memory:")
-    from app import models  # noqa: F401  (register models on Base.metadata)
-
-    Base.metadata.create_all(bind=engine)
-    session = sessionmaker(bind=engine)()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 def test_not_configured_by_default(db):

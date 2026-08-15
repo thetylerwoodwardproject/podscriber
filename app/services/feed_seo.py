@@ -12,11 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.config import config
 from app.db import SessionLocal
-from app.models import Episode, FeedEpisodeSuggestion, Job, Transcript, TranscriptSegment, now_utc
+from app.models import Episode, FeedEpisodeSuggestion, Job, now_utc
 from app.services import settings_store
 from app.services.episode_fetch import AudioDownloadError, download_audio
 from app.services.feed_catalog import load_feed_episodes
 from app.services.llm.factory import get_llm_provider
+from app.services.pipeline import save_transcript
 from app.services.transcription.factory import get_transcription_provider
 
 logger = logging.getLogger("podscriber.feed_seo")
@@ -168,28 +169,7 @@ def run_feed_episode_deep_suggest(job_id: int) -> None:
 
             transcription_provider = get_transcription_provider(db)
             result = transcription_provider.transcribe(dest)
-            transcript = Transcript(
-                episode_id=episode.id,
-                full_text=result.full_text,
-                language=result.language,
-                provider=type(transcription_provider).__name__,
-            )
-            db.add(transcript)
-            db.flush()
-            for seg in result.segments:
-                db.add(
-                    TranscriptSegment(
-                        transcript_id=transcript.id,
-                        index=seg.index,
-                        start_ms=seg.start_ms,
-                        end_ms=seg.end_ms,
-                        text=seg.text,
-                        words=[{"word": w.word, "start_ms": w.start_ms, "end_ms": w.end_ms} for w in seg.words]
-                        or None,
-                    )
-                )
-            episode.duration_seconds = result.duration_seconds
-            db.commit()
+            transcript = save_transcript(db, episode, result, type(transcription_provider).__name__)
         else:
             transcript = episode.transcript
 

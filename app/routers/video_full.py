@@ -2,12 +2,11 @@ import json
 
 from fastapi import APIRouter, Depends, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import Episode, EpisodeVideo, Job
-from app.routers._shared import recent_episodes, sanitize_download_filename
+from app.routers._shared import latest_job, recent_episodes, sanitize_download_filename, sse_job_stream
 from app.services import storage
 from app.services.jobs import submit_full_video_export
 from app.services.waveform import amplitude_envelope
@@ -139,38 +138,11 @@ def export_full_video(episode_id: int, db: Session = Depends(get_db)):
 
 @router.get("/episodes/{episode_id}/video/status/stream")
 def full_video_status_stream(episode_id: int):
-    import time as time_module
-
-    from app.db import SessionLocal
-
-    def event_source():
-        db = SessionLocal()
-        try:
-            last_payload = None
-            for _ in range(1200):  # ~10 min ceiling
-                db.commit()  # release the read transaction so we see the export job's commits
-                job = db.execute(
-                    select(Job)
-                    .where(Job.episode_id == episode_id, Job.job_type == "video_export_full")
-                    .order_by(Job.created_at.desc())
-                    .limit(1)
-                ).scalar_one_or_none()
-                if job is None:
-                    payload = {"status": "pending", "progress_pct": 0}
-                else:
-                    payload = {"status": job.status, "progress_pct": job.progress_pct, "error_message": job.error_message}
-                if payload != last_payload:
-                    yield f"data: {json.dumps(payload)}\n\n"
-                    last_payload = payload
-                if job is not None and job.status in ("done", "error"):
-                    break
-                time_module.sleep(0.5)
-        finally:
-            db.close()
-
-    from fastapi.responses import StreamingResponse
-
-    return StreamingResponse(event_source(), media_type="text/event-stream")
+    return sse_job_stream(
+        query_fn=lambda db: latest_job(db, "video_export_full", episode_id=episode_id),
+        payload_fn=lambda job: {"status": job.status, "progress_pct": job.progress_pct, "error_message": job.error_message},
+        not_found_payload={"status": "pending", "progress_pct": 0},
+    )
 
 
 @router.get("/episodes/{episode_id}/video/download")

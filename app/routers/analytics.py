@@ -15,7 +15,6 @@ logger = logging.getLogger("podscriber.stats")
 
 PI_FEED_TTL = timedelta(hours=24)
 OP3_TTL = timedelta(hours=6)
-REFRESH_FLOOR = timedelta(seconds=60)
 
 
 def _load_podcast_index_section(db: Session, s: dict, force: bool) -> dict:
@@ -24,8 +23,7 @@ def _load_podcast_index_section(db: Session, s: dict, force: bool) -> dict:
         return {"state": "not_configured"}
 
     cached = stats_cache.get(db, "podcast_index:feed")
-    should_fetch = cached is None or (force and stats_cache.is_stale(cached, REFRESH_FLOOR))
-    should_fetch = should_fetch or (cached is not None and stats_cache.is_stale(cached, PI_FEED_TTL))
+    should_fetch = stats_cache.should_refetch(cached, force, PI_FEED_TTL)
 
     if not should_fetch and cached is not None:
         if cached.ok:
@@ -69,8 +67,7 @@ def _load_podcast_index_episodes_section(db: Session, s: dict, force: bool) -> d
         return {"state": "not_configured"}
 
     cached = stats_cache.get(db, "podcast_index:episodes:analytics")
-    should_fetch = cached is None or (force and stats_cache.is_stale(cached, REFRESH_FLOOR))
-    should_fetch = should_fetch or (cached is not None and stats_cache.is_stale(cached, PI_FEED_TTL))
+    should_fetch = stats_cache.should_refetch(cached, force, PI_FEED_TTL)
 
     if not should_fetch and cached is not None:
         if cached.ok:
@@ -142,8 +139,7 @@ def _load_op3_section(db: Session, s: dict, force: bool) -> dict:
         settings_store.set_many(db, {"op3_show_uuid": show_uuid})
 
     cached = stats_cache.get(db, "op3:show_downloads")
-    should_fetch = cached is None or (force and stats_cache.is_stale(cached, REFRESH_FLOOR))
-    should_fetch = should_fetch or (cached is not None and stats_cache.is_stale(cached, OP3_TTL))
+    should_fetch = stats_cache.should_refetch(cached, force, OP3_TTL)
 
     if not should_fetch and cached is not None:
         if cached.ok:

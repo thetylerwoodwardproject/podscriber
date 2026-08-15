@@ -156,22 +156,18 @@
     fetch(base + "/export", { method: "POST" })
       .then(function (r) { return r.json(); })
       .then(function () {
-        var source = new EventSource(base + "/status/stream");
-        source.onmessage = function (evt) {
-          var payload = JSON.parse(evt.data);
+        PS.streamStatus(base + "/status/stream", function (payload) {
           if (payload.status === "running") {
             exportStatus.textContent = "Exporting… " + (payload.progress_pct || 0) + "%";
           } else if (payload.status === "done") {
             exportStatus.textContent = "Export complete — downloading…";
-            source.close();
             window.location.href = base + "/download";
             setTimeout(function () { window.location.reload(); }, 600);
           } else if (payload.status === "error") {
             exportStatus.textContent = "Export failed: " + (payload.error_message || "unknown error");
             exportBtn.disabled = false;
-            source.close();
           }
-        };
+        });
       });
   });
 })();

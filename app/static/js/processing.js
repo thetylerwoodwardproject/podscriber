@@ -47,14 +47,7 @@
     }
   }
 
-  var source = new EventSource("/episodes/" + episodeId + "/status/stream");
-  source.onmessage = function (evt) {
-    var payload = JSON.parse(evt.data);
-    render(payload);
-    if (payload.status === "done" || payload.status === "error") {
-      source.close();
-    }
-  };
+  var source = PS.streamStatus("/episodes/" + episodeId + "/status/stream", render);
   source.onerror = function () {
     // Connection dropped; the browser will retry automatically unless we've already closed it.
   };

@@ -1,16 +1,13 @@
-import asyncio
-import json
 import shutil
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, StreamingResponse
-from sqlalchemy import select
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.config import config
-from app.db import SessionLocal, get_db
+from app.db import get_db
 from app.models import Chapter, Episode, Job, Soundbite
-from app.routers._shared import recent_episodes
+from app.routers._shared import latest_job, recent_episodes, sse_job_stream
 from app.services.chapters_export import build_chapters_json
 from app.services.jobs import submit_social_regenerate
 from app.services.llm.factory import get_llm_provider
@@ -58,12 +55,7 @@ def results_page(episode_id: int, request: Request, tab: str = "titles", db: Ses
 
     last_error = None
     if episode.status == "error":
-        failed_job = db.execute(
-            select(Job)
-            .where(Job.episode_id == episode_id, Job.job_type == "episode_processing")
-            .order_by(Job.created_at.desc())
-            .limit(1)
-        ).scalar_one_or_none()
+        failed_job = latest_job(db, "episode_processing", episode_id=episode_id)
         if failed_job is not None:
             last_error = failed_job.error_message
 
@@ -176,35 +168,11 @@ def regenerate_social_posts(episode_id: int, tone: str = Form("casual"), db: Ses
 
 @router.get("/episodes/{episode_id}/social/regenerate/status/stream")
 def social_regenerate_status_stream(episode_id: int):
-    async def event_source():
-        # Async, not sync — see processing.py's status_stream for why a sync generator
-        # here would starve FastAPI's worker thread pool when the job status is idle.
-        last_payload = None
-        for _ in range(1200):  # ~10 min ceiling, matches the video-export status stream
-            # Open a fresh, short-lived session per poll instead of holding one for the
-            # whole loop — see the matching comment in processing.py's status_stream.
-            db = SessionLocal()
-            try:
-                job = db.execute(
-                    select(Job)
-                    .where(Job.episode_id == episode_id, Job.job_type == "social_regenerate")
-                    .order_by(Job.created_at.desc())
-                    .limit(1)
-                ).scalar_one_or_none()
-                if job is None:
-                    payload = {"status": "pending"}
-                else:
-                    payload = {"status": job.status, "error_message": job.error_message}
-            finally:
-                db.close()
-            if payload != last_payload:
-                yield f"data: {json.dumps(payload)}\n\n"
-                last_payload = payload
-            if job is not None and job.status in ("done", "error"):
-                break
-            await asyncio.sleep(0.5)
-
-    return StreamingResponse(event_source(), media_type="text/event-stream")
+    return sse_job_stream(
+        query_fn=lambda db: latest_job(db, "social_regenerate", episode_id=episode_id),
+        payload_fn=lambda job: {"status": job.status, "error_message": job.error_message},
+        not_found_payload={"status": "pending"},
+    )
 
 
 @router.get("/episodes/{episode_id}/social/posts-fragment", response_class=HTMLResponse)

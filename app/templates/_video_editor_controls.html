@@ -1,0 +1,55 @@
+<div>
+  <div class="field-caption">Background image</div>
+  <input type="file" id="bg-file-input" accept="image/*" style="display:none">
+  <div style="display:flex;gap:10px">
+    <button type="button" class="btn btn-outline" id="upload-bg-btn">Upload image</button>
+    <button type="button" class="btn btn-outline" id="remove-bg-btn" style="{% if not target.background_image_path %}display:none;{% endif %}">Remove</button>
+  </div>
+</div>
+
+<div>
+  <div class="field-caption" style="display:flex;justify-content:space-between">
+    <span>Brightness</span><span id="brightness-label" style="text-transform:none;color:var(--muted-light);font-weight:500">{{ (target.brightness * 100) | round | int }}%</span>
+  </div>
+  <input type="range" min="0.4" max="1.6" step="0.01" value="{{ target.brightness }}" id="brightness-input" style="width:100%">
+</div>
+
+<div>
+  <div class="field-caption">Brand mark</div>
+  <input type="file" id="logo-file-input" accept="image/*" style="display:none">
+  <div style="display:flex;gap:10px">
+    <button type="button" class="btn btn-outline" id="upload-logo-btn">Upload logo</button>
+    <button type="button" class="btn btn-outline" id="remove-logo-btn" style="{% if not target.logo_image_path %}display:none;{% endif %}">Use default</button>
+  </div>
+</div>
+
+<div>
+  <div class="field-caption">Waveform color</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    {% for sw in swatches %}
+    <button type="button" class="waveform-swatch" data-color="{{ sw }}" style="width:22px;height:22px;border-radius:50%;background:{{ sw }};border:2px solid {{ 'var(--accent)' if target.waveform_color.lower() == sw.lower() else 'var(--border)' }};cursor:pointer;padding:0;flex-shrink:0"></button>
+    {% endfor %}
+    <input type="text" id="hex-input" value="{{ target.waveform_color }}" placeholder="#e2572c" style="width:96px;font-family:ui-monospace,monospace;font-size:13px">
+  </div>
+  <p style="margin:10px 0 0;color:var(--muted-light);font-size:12.5px;line-height:1.5">Drag the waveform in the preview to reposition it vertically.</p>
+</div>
+
+<div>
+  <div class="field-caption">Caption</div>
+  <textarea id="caption-input" rows="3">{{ target.caption }}</textarea>
+</div>
+
+<div>
+  <div class="field-caption">Download file name</div>
+  <input type="text" id="filename-input" value="{{ target.download_filename or '' }}" placeholder="{{ filename_placeholder }}" style="width:100%">
+  <p style="margin:6px 0 0;color:var(--muted-light);font-size:12.5px;line-height:1.5">Used for the downloaded file. ".mp4" is added automatically.</p>
+</div>
+
+<button type="button" class="btn btn-primary" id="export-btn" style="justify-content:center">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6"></path><path d="M5 21h14"></path></svg>
+  {{ export_label }}
+</button>
+<div id="export-status" style="font-size:13px;color:var(--muted)"></div>
+{% if target.exported_video_path %}
+<a href="{{ download_url }}" class="btn btn-outline" style="justify-content:center">Download last export</a>
+{% endif %}

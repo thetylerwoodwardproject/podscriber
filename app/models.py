@@ -10,7 +10,11 @@ def now_utc() -> datetime:
     return datetime.now(UTC)
 
 
-class Episode(Base):
+class TimestampMixin:
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
+
+
+class Episode(TimestampMixin, Base):
     __tablename__ = "episodes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -21,7 +25,6 @@ class Episode(Base):
     duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String, default="draft")  # draft|processing|processed|error
     source: Mapped[str] = mapped_column(String, default="upload")  # upload|feed
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc, onupdate=now_utc)
 
     transcript: Mapped["Transcript | None"] = relationship(
@@ -42,7 +45,7 @@ class Episode(Base):
     )
 
 
-class Job(Base):
+class Job(TimestampMixin, Base):
     __tablename__ = "jobs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -55,14 +58,13 @@ class Job(Base):
     current_step: Mapped[str] = mapped_column(String, default="")
     progress_pct: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     episode: Mapped["Episode | None"] = relationship(back_populates="jobs")
 
 
-class Transcript(Base):
+class Transcript(TimestampMixin, Base):
     __tablename__ = "transcripts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -70,7 +72,6 @@ class Transcript(Base):
     full_text: Mapped[str] = mapped_column(Text, default="")
     language: Mapped[str | None] = mapped_column(String, nullable=True)
     provider: Mapped[str] = mapped_column(String)  # local_whisper|openai_whisper
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
 
     episode: Mapped["Episode"] = relationship(back_populates="transcript")
     segments: Mapped[list["TranscriptSegment"]] = relationship(
@@ -176,7 +177,7 @@ class Chapter(Base):
     episode: Mapped["Episode"] = relationship(back_populates="chapters")
 
 
-class GeneratedScript(Base):
+class GeneratedScript(TimestampMixin, Base):
     __tablename__ = "generated_scripts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -185,7 +186,6 @@ class GeneratedScript(Base):
     outline: Mapped[list] = mapped_column(JSON, default=list)  # [str]
     script_text: Mapped[str] = mapped_column(Text, default="")
     llm_provider: Mapped[str] = mapped_column(String, default="")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
 
 
 class FeedEpisodeSuggestion(Base):

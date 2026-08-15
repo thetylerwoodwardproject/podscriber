@@ -5,17 +5,7 @@ import time
 import httpx
 
 from app.config import config
-from app.services.llm import prompts
-from app.services.llm.base import (
-    SOCIAL_PLATFORMS,
-    ChapterCandidate,
-    DescriptionAndKeywords,
-    ScriptResult,
-    SeoSuggestion,
-    SocialGroup,
-    SoundbiteCandidate,
-    TitleCandidate,
-)
+from app.services.llm.base import BaseLLMProvider
 
 _THINK_TAG_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 _CODE_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
@@ -45,7 +35,7 @@ def list_models(base_url: str | None = None) -> list[str] | None:
         return None
 
 
-class OllamaProvider:
+class OllamaProvider(BaseLLMProvider):
     def __init__(
         self,
         model: str,
@@ -101,48 +91,3 @@ class OllamaProvider:
         resp.raise_for_status()
         content = resp.json()["message"]["content"]
         return _extract_json(content)
-
-    def generate_titles(self, transcript_text: str) -> list[TitleCandidate]:
-        system, user, schema = prompts.titles_prompt(transcript_text, self.custom_instructions)
-        data = self._call(system, user, schema)
-        return [TitleCandidate(text=t["text"], score=int(t["score"])) for t in data["titles"]]
-
-    def generate_description_and_keywords(self, transcript_text: str) -> DescriptionAndKeywords:
-        system, user, schema = prompts.description_prompt(transcript_text, self.custom_instructions)
-        data = self._call(system, user, schema)
-        return DescriptionAndKeywords(description=data["description"], keywords=data["keywords"])
-
-    def generate_social_posts(self, transcript_text: str, description: str, tone: str = "casual") -> list[SocialGroup]:
-        system, user, schema = prompts.social_posts_prompt(transcript_text, description, tone, self.custom_instructions)
-        data = self._call(system, user, schema)
-        key_map = {"X": "x_posts", "Instagram": "instagram_posts", "Threads": "threads_posts"}
-        return [
-            SocialGroup(platform=name, initial=initial, color=color, posts=data[key_map[name]])
-            for name, initial, color in SOCIAL_PLATFORMS
-        ]
-
-    def select_soundbites(self, transcript_text: str) -> list[SoundbiteCandidate]:
-        system, user, schema = prompts.soundbites_prompt(transcript_text, self.custom_instructions)
-        data = self._call(system, user, schema)
-        return [SoundbiteCandidate(quote=s["quote"]) for s in data["soundbites"]]
-
-    def generate_chapters(self, transcript_text: str) -> list[ChapterCandidate]:
-        system, user, schema = prompts.chapters_prompt(transcript_text, self.custom_instructions)
-        data = self._call(system, user, schema)
-        return [ChapterCandidate(title=c["title"], start_quote=c["start_quote"]) for c in data["chapters"]]
-
-    def generate_seo_suggestion(
-        self, title: str, description: str, transcript_text: str | None = None
-    ) -> SeoSuggestion:
-        system, user, schema = prompts.seo_suggestion_prompt(
-            title, description, self.custom_instructions, transcript_text
-        )
-        data = self._call(system, user, schema)
-        return SeoSuggestion(title=data["title"], description=data["description"], keywords=data["keywords"])
-
-    def generate_script(
-        self, topic: str, research: str, style_excerpts: str, custom_instructions: str = ""
-    ) -> ScriptResult:
-        system, user, schema = prompts.script_prompt(topic, research, style_excerpts, custom_instructions)
-        data = self._call(system, user, schema)
-        return ScriptResult(outline=data["outline"], script=data["script"])

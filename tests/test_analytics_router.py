@@ -1,23 +1,5 @@
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-from app.db import Base
 from app.routers import analytics as stats_router
 from app.services import op3, podcast_index, settings_store
-
-
-@pytest.fixture
-def db():
-    engine = create_engine("sqlite:///:memory:")
-    from app import models  # noqa: F401  (register models on Base.metadata)
-
-    Base.metadata.create_all(bind=engine)
-    session = sessionmaker(bind=engine)()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 def test_both_sections_not_configured_by_default(db):
