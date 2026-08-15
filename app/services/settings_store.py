@@ -18,6 +18,8 @@ DEFAULTS = {
     "op3_show_uuid": "",  # resolved via OP3's /shows lookup, cleared whenever podcast_feed_url changes
     "text_provider": "ollama",  # claude|ollama|openai
     "ollama_model": "qwen3:4b-instruct",
+    "ollama_num_ctx": "",  # Ollama's num_ctx option; blank = use the model's own default
+    "ollama_keep_alive": "",  # Ollama's keep_alive option; blank = use Ollama's own default (5m)
     "transcription_provider": "local",  # local|openai
     "local_whisper_model_size": "small",
     "custom_instructions": "",  # applied to every AI generation step: titles, description, social, soundbites, chapters

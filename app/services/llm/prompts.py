@@ -80,8 +80,10 @@ def titles_prompt(transcript_text: str, custom_instructions: str = "") -> tuple[
 def description_prompt(transcript_text: str, custom_instructions: str = "") -> tuple[str, str, dict]:
     system = (
         "You write podcast show notes and suggest SEO-friendly keywords. Show notes should be "
-        "2-3 short paragraphs: a hook, what's covered, and why it's worth listening to. Never "
-        "use an em dash (—) or en dash (–) anywhere in the show notes."
+        "2-3 short paragraphs: a hook, what's covered, and why it's worth listening to. Separate "
+        "each paragraph with a blank line (two newlines) inside the description string — do not "
+        "return it as a single unbroken block of text. Never use an em dash (—) or en dash (–) "
+        "anywhere in the show notes."
     )
     system = _with_custom_instructions(system, custom_instructions)
     user = (

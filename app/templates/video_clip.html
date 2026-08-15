@@ -86,11 +86,12 @@
 {% block scripts %}
 <script>
 window.PODSCRIBER_CLIP = {
-  episodeId: {{ episode.id }},
-  soundbiteId: {{ soundbite.id }},
+  base: "/episodes/{{ episode.id }}/soundbites/{{ soundbite.id }}/video",
   envelope: {{ envelope_json | safe }},
   waveformColor: {{ clip.waveform_color | tojson }},
-  waveformOffsetY: {{ clip.waveform_offset_y }}
+  waveformOffsetY: {{ clip.waveform_offset_y }},
+  waveformOffsetMin: -380,
+  waveformOffsetMax: 60
 };
 </script>
 <script src="{{ asset_url('js/video_editor.js') }}"></script>

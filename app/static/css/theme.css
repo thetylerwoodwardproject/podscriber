@@ -196,7 +196,7 @@ h1, h2, h3, .sora {
   background-repeat: no-repeat; background-position: right 14px center;
 }
 
-textarea, input[type=text], input[type=password], input[type=file], input[type=url] {
+textarea, input[type=text], input[type=password], input[type=file], input[type=url], input[type=number] {
   color: var(--text); background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px;
   padding: 10px 14px; font-size: 14px;
 }
@@ -206,6 +206,8 @@ textarea { width: 100%; box-sizing: border-box; resize: vertical; line-height: 1
 .settings-card + .settings-card { margin-top: 26px; }
 .settings-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .field-label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin: 14px 0 6px; }
+.field-subinput { width: 100%; box-sizing: border-box; margin-top: 8px; display: none; }
+.field-subinput.field-subinput-visible { display: block; }
 .status-pill { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; }
 .status-connected { background: var(--status-processed-bg); color: var(--status-processed-fg); }
 .status-not-connected { background: var(--faint); color: var(--muted-light); }
@@ -345,7 +347,7 @@ button.is-busy, .btn.is-busy { opacity: .6; cursor: progress; pointer-events: no
 
   /* iOS Safari auto-zooms the page when a focused input/textarea/select has a font-size
      under 16px — keep every text field at or above that threshold on narrow viewports. */
-  textarea, input[type=text], input[type=password], input[type=file], input[type=url], select,
+  textarea, input[type=text], input[type=password], input[type=file], input[type=url], input[type=number], select,
   .suggest-field textarea, .suggest-field input[type=text] {
     font-size: 16px;
   }

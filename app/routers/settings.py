@@ -1,28 +1,20 @@
-import httpx
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
-from app.config import config
 from app.db import get_db
 from app.routers._shared import recent_episodes
 from app.services import settings_store
+from app.services.llm import ollama_provider
 from app.templating import templates
 
 router = APIRouter()
 
 
-def _ollama_reachable() -> bool:
-    try:
-        r = httpx.get(f"{config.ollama_base_url}/api/tags", timeout=1.5)
-        return r.status_code == 200
-    except httpx.HTTPError:
-        return False
-
-
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, db: Session = Depends(get_db)):
     values = settings_store.get_all(db)
+    ollama_models = ollama_provider.list_models()
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -30,7 +22,8 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
             "active_nav": "settings",
             "recent_episodes": recent_episodes(db),
             "s": values,
-            "ollama_reachable": _ollama_reachable(),
+            "ollama_models": ollama_models or [],
+            "ollama_reachable": ollama_models is not None,
         },
     )
 
@@ -49,6 +42,8 @@ def save_settings(
     op3_api_key: str = Form(""),
     text_provider: str = Form("ollama"),
     ollama_model: str = Form("qwen3:4b-instruct"),
+    ollama_num_ctx: str = Form(""),
+    ollama_keep_alive: str = Form(""),
     transcription_provider: str = Form("local"),
     local_whisper_model_size: str = Form("small"),
     custom_instructions: str = Form(""),
@@ -77,6 +72,8 @@ def save_settings(
         "op3_api_key": op3_api_key.strip(),
         "text_provider": text_provider,
         "ollama_model": ollama_model.strip(),
+        "ollama_num_ctx": ollama_num_ctx.strip(),
+        "ollama_keep_alive": ollama_keep_alive.strip(),
         "transcription_provider": transcription_provider,
         "local_whisper_model_size": local_whisper_model_size,
         "custom_instructions": custom_instructions.strip(),

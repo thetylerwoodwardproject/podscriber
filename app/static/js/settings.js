@@ -24,3 +24,24 @@
 
   applyShareState(checkbox.checked);
 })();
+
+(function () {
+  var preset = document.getElementById("ollama-keep-alive-preset");
+  var custom = document.getElementById("ollama-keep-alive-custom");
+  if (!preset || !custom) return;
+
+  function applyKeepAliveState() {
+    var isCustom = preset.value === "custom";
+    custom.classList.toggle("field-subinput-visible", isCustom);
+    if (isCustom) {
+      preset.removeAttribute("name");
+      custom.setAttribute("name", "ollama_keep_alive");
+    } else {
+      preset.setAttribute("name", "ollama_keep_alive");
+      custom.removeAttribute("name");
+    }
+  }
+
+  preset.addEventListener("change", applyKeepAliveState);
+  applyKeepAliveState();
+})();

@@ -27,6 +27,7 @@ TABS = [
     ("keywords", "Keywords"),
     ("chapters", "Chapters"),
     ("soundbites", "Soundbites"),
+    ("video", "Video"),
     ("transcript", "Transcript"),
 ]
 
@@ -74,6 +75,7 @@ def results_page(episode_id: int, request: Request, tab: str = "titles", db: Ses
         "transcript": transcript,
         "soundbites": episode.soundbites,
         "chapters": episode.chapters,
+        "episode_video": episode.video,
         "tabs": TABS,
         "active_tab": tab,
         "last_error": last_error,

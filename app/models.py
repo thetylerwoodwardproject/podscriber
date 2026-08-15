@@ -37,6 +37,9 @@ class Episode(Base):
         back_populates="episode", cascade="all, delete-orphan", order_by="Chapter.start_ms"
     )
     jobs: Mapped[list["Job"]] = relationship(back_populates="episode", cascade="all, delete-orphan")
+    video: Mapped["EpisodeVideo | None"] = relationship(
+        back_populates="episode", uselist=False, cascade="all, delete-orphan"
+    )
 
 
 class Job(Base):
@@ -141,6 +144,24 @@ class VideoClip(Base):
     exported_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     soundbite: Mapped["Soundbite"] = relationship(back_populates="video_clip")
+
+
+class EpisodeVideo(Base):
+    __tablename__ = "episode_videos"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    episode_id: Mapped[int] = mapped_column(ForeignKey("episodes.id"), unique=True)
+    background_image_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    logo_image_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    brightness: Mapped[float] = mapped_column(Float, default=1.0)
+    waveform_offset_y: Mapped[int] = mapped_column(Integer, default=0)
+    caption: Mapped[str] = mapped_column(Text, default="")
+    waveform_color: Mapped[str] = mapped_column(String, default="#e2572c")
+    download_filename: Mapped[str | None] = mapped_column(String, nullable=True)
+    exported_video_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    exported_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    episode: Mapped["Episode"] = relationship(back_populates="video")
 
 
 class Chapter(Base):

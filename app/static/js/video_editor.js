@@ -1,6 +1,6 @@
 (function () {
   var cfg = window.PODSCRIBER_CLIP;
-  var base = "/episodes/" + cfg.episodeId + "/soundbites/" + cfg.soundbiteId + "/video";
+  var base = cfg.base;
 
   var bgLayer = document.getElementById("bg-layer");
   var uploadHint = document.getElementById("upload-hint");
@@ -123,7 +123,7 @@
 
   // --- Drag the waveform band up/down (vertical-only — x never changes) ---
   var waveformBand = document.getElementById("waveform-band");
-  var WAVEFORM_OFFSET_MIN = -380, WAVEFORM_OFFSET_MAX = 60;
+  var WAVEFORM_OFFSET_MIN = cfg.waveformOffsetMin, WAVEFORM_OFFSET_MAX = cfg.waveformOffsetMax;
   var waveformOffsetY = cfg.waveformOffsetY || 0;
   var waveDrag = null;
 

@@ -1,0 +1,19 @@
+<div style="max-width:520px;display:flex;flex-direction:column;gap:16px">
+  <p style="margin:0;color:var(--muted-light);font-size:13.5px;line-height:1.6">
+    Turn this episode's full audio into a landscape (16:9) video with a background image, brand
+    mark, and an animated waveform &mdash; the same styling options as soundbite videos, sized
+    for the whole episode.
+  </p>
+  <div style="display:flex;gap:10px">
+    <a href="/episodes/{{ episode.id }}/video" class="btn btn-primary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="13" height="12" rx="2.5"></rect><path d="M15.5 10.2l5-3v9.6l-5-3z"></path></svg>
+      Create full-length video
+    </a>
+    {% if episode_video and episode_video.exported_video_path %}
+    <a href="/episodes/{{ episode.id }}/video/download" class="btn btn-outline">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6"></path><path d="M5 21h14"></path></svg>
+      Download last export
+    </a>
+    {% endif %}
+  </div>
+</div>

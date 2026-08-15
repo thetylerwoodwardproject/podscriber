@@ -35,6 +35,12 @@ def submit_video_export(job_id: int) -> None:
     _executor.submit(_run_guarded, job_id, run_video_export)
 
 
+def submit_full_video_export(job_id: int) -> None:
+    from app.services.video_export_full import run_full_video_export
+
+    _executor.submit(_run_guarded, job_id, run_full_video_export)
+
+
 def submit_social_regenerate(job_id: int, tone: str) -> None:
     from app.services.social_regen import run_social_regenerate
 

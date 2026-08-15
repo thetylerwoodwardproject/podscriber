@@ -4,6 +4,14 @@ from app.services import settings_store
 from app.services.llm.base import LLMProvider
 
 
+def _parse_positive_int(raw: str) -> int | None:
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
 def get_llm_provider(db: Session) -> LLMProvider:
     provider = settings_store.get(db, "text_provider")
     custom_instructions = settings_store.get(db, "custom_instructions")
@@ -29,4 +37,8 @@ def get_llm_provider(db: Session) -> LLMProvider:
     from app.services.llm.ollama_provider import OllamaProvider
 
     model = settings_store.get(db, "ollama_model") or "qwen3:4b-instruct"
-    return OllamaProvider(model=model, custom_instructions=custom_instructions)
+    num_ctx = _parse_positive_int(settings_store.get(db, "ollama_num_ctx"))
+    keep_alive = settings_store.get(db, "ollama_keep_alive") or None
+    return OllamaProvider(
+        model=model, custom_instructions=custom_instructions, num_ctx=num_ctx, keep_alive=keep_alive
+    )

@@ -42,6 +42,7 @@ from app.routers import (  # noqa: E402
     settings,
     upload,
     video_clip,
+    video_full,
 )
 
 app.include_router(library.router)
@@ -49,6 +50,7 @@ app.include_router(upload.router)
 app.include_router(processing.router)
 app.include_router(results.router)
 app.include_router(video_clip.router)
+app.include_router(video_full.router)
 app.include_router(settings.router)
 app.include_router(analytics.router)
 app.include_router(improvements.router)

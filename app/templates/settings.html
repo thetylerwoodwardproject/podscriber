@@ -43,8 +43,32 @@
     </div>
 
     <label class="field-label">Ollama model</label>
-    <input type="text" name="ollama_model" value="{{ s.ollama_model }}" placeholder="qwen3:4b-instruct" style="width:100%">
-    <p style="margin:6px 0 0;color:var(--muted-light);font-size:12px">Ollama at localhost:11434 is currently {{ 'reachable' if ollama_reachable else 'not reachable' }}.</p>
+    <select name="ollama_model" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--input-bg);color:var(--text)">
+      {% for m in ollama_models %}
+      <option value="{{ m }}" {% if s.ollama_model == m %}selected{% endif %}>{{ m }}</option>
+      {% endfor %}
+      {% if s.ollama_model not in ollama_models %}
+      <option value="{{ s.ollama_model }}" selected>{{ s.ollama_model }} (saved, not currently installed)</option>
+      {% endif %}
+    </select>
+    <p style="margin:6px 0 0;color:var(--muted-light);font-size:12px">Ollama at localhost:11434 is currently {{ 'reachable' if ollama_reachable else 'not reachable' }}{% if ollama_reachable and not ollama_models %} but no models are pulled — run `ollama pull &lt;model&gt;`{% endif %}.</p>
+
+    <label class="field-label">Ollama context size (num_ctx)</label>
+    <input type="number" name="ollama_num_ctx" value="{{ s.ollama_num_ctx }}" min="1" step="1" placeholder="Model default" style="width:100%">
+    <p style="margin:6px 0 0;color:var(--muted-light);font-size:12px">Context window (in tokens) Ollama allocates per request. Leave blank to use the model's default. Larger values need more RAM and run slower.</p>
+
+    {% set ollama_keep_alive_presets = ["", "30m", "1h", "-1", "0"] %}
+    <label class="field-label">Ollama keep-alive</label>
+    <select id="ollama-keep-alive-preset" name="ollama_keep_alive" style="width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--input-bg);color:var(--text)">
+      <option value="" {% if s.ollama_keep_alive == "" %}selected{% endif %}>5 minutes (default)</option>
+      <option value="30m" {% if s.ollama_keep_alive == "30m" %}selected{% endif %}>30 minutes</option>
+      <option value="1h" {% if s.ollama_keep_alive == "1h" %}selected{% endif %}>1 hour</option>
+      <option value="-1" {% if s.ollama_keep_alive == "-1" %}selected{% endif %}>Keep loaded forever</option>
+      <option value="0" {% if s.ollama_keep_alive == "0" %}selected{% endif %}>Unload immediately</option>
+      <option value="custom" {% if s.ollama_keep_alive not in ollama_keep_alive_presets %}selected{% endif %}>Custom…</option>
+    </select>
+    <input type="text" id="ollama-keep-alive-custom" value="{{ s.ollama_keep_alive if s.ollama_keep_alive not in ollama_keep_alive_presets else '' }}" placeholder="e.g. 45m" class="field-subinput">
+    <p style="margin:6px 0 0;color:var(--muted-light);font-size:12px">How long Ollama keeps this model loaded in memory after a request before unloading it to free RAM. "Keep loaded forever" avoids reload delays between jobs; "Unload immediately" frees RAM right away. Leave on the default if unsure.</p>
 
     <label class="field-label">Custom instructions</label>
     <textarea name="custom_instructions" rows="4" placeholder="e.g. Write like a sports commentator, keep social posts under 200 characters, always include a question.">{{ s.custom_instructions }}</textarea>

@@ -31,7 +31,7 @@
   {% for s in scripts %}
   <a href="/generator/{{ s.id }}" class="card" style="display:flex;justify-content:space-between;align-items:center;gap:14px;text-decoration:none;color:inherit">
     <div style="min-width:0">
-      <div class="card-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.topic }}</div>
+      <div class="card-title" style="overflow-wrap:break-word">{{ s.topic }}</div>
       <div class="card-date">{{ s.created_at.strftime("%b %-d, %Y %-I:%M %p") }}</div>
     </div>
     {% if not s.script_text %}<span class="status-pill" style="background:var(--status-processing-bg);color:var(--status-processing-fg)">In progress</span>{% endif %}
