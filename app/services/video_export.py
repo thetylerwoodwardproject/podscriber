@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import tempfile
 from datetime import UTC, datetime
@@ -6,8 +7,11 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageEnhance
 
 from app.db import SessionLocal
-from app.models import Job, Soundbite, VideoClip
+from app.models import Job, VideoClip
 from app.services import storage
+from app.services.llm.factory import get_llm_provider
+
+logger = logging.getLogger("podscriber.video_export")
 
 CANVAS_W, CANVAS_H = 1080, 1920
 EDITOR_FRAME_W = 280  # matches the CSS preview frame width; offsets recorded there are scaled up by this ratio
@@ -77,17 +81,34 @@ def run_video_export(job_id: int) -> None:
         job = db.get(Job, job_id)
         if job is None:
             return
-        soundbite = db.get(Soundbite, job.soundbite_id)
-        clip = soundbite.video_clip if soundbite else None
+        clip = db.get(VideoClip, job.video_clip_id) if job.video_clip_id else None
+        soundbite = clip.soundbite if clip else None
         if soundbite is None or clip is None:
             raise RuntimeError("Soundbite or its video clip settings could not be found.")
         if not soundbite.clip_audio_path or not Path(soundbite.clip_audio_path).exists():
             raise RuntimeError("Soundbite audio has not been clipped yet.")
 
         job.status = "running"
+        job.started_at = datetime.now(UTC)
+        db.commit()
+
+        if not clip.social_post and not clip.youtube_title:
+            job.current_step = "writing social copy"
+            job.progress_pct = 10
+            db.commit()
+            try:
+                llm = get_llm_provider(db)
+                result = llm.generate_clip_social(
+                    soundbite.quote, soundbite.episode.title or soundbite.episode.original_filename
+                )
+                clip.social_post = result.social_post
+                clip.youtube_title = result.youtube_title
+                db.commit()
+            except Exception:
+                logger.warning("Clip social generation failed for job %s", job_id, exc_info=True)
+
         job.current_step = "compositing"
         job.progress_pct = 20
-        job.started_at = datetime.now(UTC)
         db.commit()
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -103,7 +124,9 @@ def run_video_export(job_id: int) -> None:
                 color_hex = "e2572c"
             ffmpeg_color = f"0x{color_hex}"
 
-            out_path = storage.video_dir(soundbite.episode_id) / f"{soundbite.id}.mp4"
+            # Keyed by clip id, not soundbite id: a soundbite can have several video
+            # variants (duplicates), and they must not overwrite each other's export file.
+            out_path = storage.video_dir(soundbite.episode_id) / f"clip-{clip.id}.mp4"
 
             # `-loop 1` on the still-image input makes it an infinite-duration stream. `-shortest`
             # alone is not reliable here: it only trims at the muxer once it sees packets past the

@@ -51,6 +51,15 @@ body { margin: 0; }
 ::selection { background: var(--accent-soft); }
 a { color: var(--accent); }
 
+/* Themed scrollbars — without this every scroll area (sidebar, textareas, any overflow
+   container) falls back to the OS's raw default scrollbar, which reads as unstyled against
+   the app's light/dark theme. Colors are theme tokens, so this adapts automatically. */
+* { scrollbar-width: thin; scrollbar-color: var(--border) var(--faint); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--faint); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; border: 2px solid var(--faint); }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-light); }
+
 body, input, textarea, select, button {
   font-family: 'Public Sans', system-ui, sans-serif;
 }
@@ -196,11 +205,47 @@ h1, h2, h3, .sora {
   background-repeat: no-repeat; background-position: right 14px center;
 }
 
-textarea, input[type=text], input[type=password], input[type=file], input[type=url], input[type=number] {
+textarea, input[type=text], input[type=password], input[type=file], input[type=url], input[type=number],
+input[type=datetime-local], select {
   color: var(--text); background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px;
   padding: 10px 14px; font-size: 14px;
 }
 textarea { width: 100%; box-sizing: border-box; resize: vertical; line-height: 1.6; }
+
+/* Selector specificity must match (or beat) the shared input rule above — a bare `.compact-field`
+   class (0,1,0) loses to `input[type=datetime-local]` (0,1,1), so its padding/font-size would
+   silently never apply to a datetime input while working fine on a <select>. */
+input.compact-field, select.compact-field { padding: 6px 10px; font-size: 12.5px; border-radius: 8px; }
+
+/* A <select> won't shrink below its longest <option>'s rendered width by default — a long
+   option label (an uploaded filename, a soundbite quote) forces the select, and anything
+   laying it out (a flex row, a CSS grid card track), wider than intended. min-width:0
+   lets the box actually shrink to fit its container; overflow+ellipsis then truncate the
+   *displayed* value instead of blowing out the layout. The full label is still visible when
+   the dropdown itself is open. */
+select.attachment-select {
+  flex: 1 1 140px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-row { display: flex; align-items: center; gap: 8px; }
+
+.attachment-preview {
+  display: none;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--faint);
+  border: 1px solid var(--border);
+}
+.attachment-preview.attachment-preview-visible { display: block; }
+.attachment-preview img, .attachment-preview video { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .settings-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 20px; max-width: 560px; }
 .settings-card + .settings-card { margin-top: 26px; }

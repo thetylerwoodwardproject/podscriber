@@ -1,12 +1,24 @@
+{% if soundbites %}
+<div id="soundbites-bulk-bar" style="display:flex;align-items:center;gap:14px;margin-bottom:14px;max-width:760px">
+  <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted-light)">
+    <input type="checkbox" id="select-all-soundbites">
+    Select all
+  </label>
+  <button type="button" id="export-selected-btn" class="btn btn-outline" data-episode-id="{{ episode.id }}" style="padding:6px 12px;font-size:12.5px" disabled>Export selected</button>
+  <span id="export-selected-status" style="font-size:12.5px;color:var(--muted-light)"></span>
+</div>
+{% endif %}
 <div style="display:flex;flex-direction:column;gap:14px;max-width:760px">
   {% for sb in soundbites %}
   <div class="soundbite-card">
+    <input type="checkbox" class="soundbite-checkbox" value="{{ sb.id }}" style="margin-right:2px">
     <button class="play-btn" data-play-btn data-src="/media/uploads/{{ episode.id }}/clips/{{ sb.id }}.mp3" title="Play">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" data-play-icon><path d="M7 5.5v13a1 1 0 001.5.87l11-6.5a1 1 0 000-1.74l-11-6.5A1 1 0 007 5.5z"></path></svg>
     </button>
     <div class="soundbite-quote" style="flex:1;min-width:0">
       <p style="margin:0 0 6px;font-size:14.5px;font-style:italic;line-height:1.5">"{{ sb.quote }}"</p>
       <span style="font-size:12.5px;color:var(--muted-light);font-family:ui-monospace,monospace">{{ sb.start_ms | clock }} – {{ sb.end_ms | clock }}</span>
+      <span class="soundbite-export-status" data-soundbite-id="{{ sb.id }}" style="font-size:11.5px;color:var(--muted-light);margin-left:8px"></span>
     </div>
     <form method="post" action="/episodes/{{ episode.id }}/soundbites/{{ sb.id }}/toggle-include" data-ajax data-ajax-on-success="set-class" data-ajax-set-target=".include-toggle" data-ajax-set-field="include" data-ajax-set-class="on">
       <button type="submit" class="include-toggle {{ 'on' if sb.include else '' }}">
@@ -17,10 +29,21 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M6 10l6 6 6-6"></path><path d="M5 21h14"></path></svg>
       Download
     </a>
-    <a href="/episodes/{{ episode.id }}/soundbites/{{ sb.id }}/video" class="btn btn-outline" style="padding:7px 11px;font-size:12.5px">
+    {% if sb.video_clips|length > 1 %}
+    <div style="display:flex;align-items:center;gap:6px">
+      <select class="video-variant-select compact-field">
+        {% for c in sb.video_clips %}
+        <option value="{{ c.id }}" data-url="/episodes/{{ episode.id }}/soundbites/{{ sb.id }}/video/{{ c.id }}">Video {{ loop.index }}{% if c.exported_video_path %} · exported{% endif %}</option>
+        {% endfor %}
+      </select>
+      <button type="button" class="btn btn-outline video-variant-edit-btn" style="padding:7px 11px;font-size:12.5px">Edit</button>
+    </div>
+    {% else %}
+    <a href="/episodes/{{ episode.id }}/soundbites/{{ sb.id }}/video{% if sb.video_clips %}/{{ sb.video_clips[0].id }}{% endif %}" class="btn btn-outline" style="padding:7px 11px;font-size:12.5px">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="13" height="12" rx="2.5"></rect><path d="M15.5 10.2l5-3v9.6l-5-3z"></path></svg>
-      Create video
+      Edit video
     </a>
+    {% endif %}
   </div>
   {% else %}
   <div class="empty-state">No soundbites found for this episode.</div>

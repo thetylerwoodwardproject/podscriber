@@ -34,10 +34,78 @@
   <p style="margin:10px 0 0;color:var(--muted-light);font-size:12.5px;line-height:1.5">Drag the waveform in the preview to reposition it vertically.</p>
 </div>
 
+{% if show_clip_social %}
+<div>
+  <div class="field-caption" style="display:flex;justify-content:space-between;align-items:center">
+    <span>Social post (YouTube &amp; TikTok)</span>
+    {% if not target.social_post %}
+    <button type="button" class="btn btn-outline" id="social-regen-btn" style="padding:4px 10px;font-size:12px">Generate</button>
+    {% endif %}
+  </div>
+  <textarea id="social-post-input" rows="4">{{ target.social_post }}</textarea>
+  <p id="social-regen-status" style="margin:8px 0 0;color:var(--muted-light);font-size:12.5px;line-height:1.5">{% if target.social_post %}Includes hashtags — same text works for both platforms.{% endif %}</p>
+</div>
+<div>
+  <div class="field-caption" style="display:flex;justify-content:space-between">
+    <span>YouTube title</span><span id="youtube-title-count" style="text-transform:none;color:var(--muted-light);font-weight:500">{{ target.youtube_title|length }}/99</span>
+  </div>
+  <input type="text" id="youtube-title-input" maxlength="99" value="{{ target.youtube_title }}" style="width:100%">
+</div>
+{% else %}
 <div>
   <div class="field-caption">Caption</div>
   <textarea id="caption-input" rows="3">{{ target.caption }}</textarea>
 </div>
+{% endif %}
+
+{% if show_clip_social and publish_platforms is defined %}
+<div>
+  <div class="field-caption">Publish to Postiz</div>
+  {% if not postiz_configured %}
+  <p style="margin:0;color:var(--muted-light);font-size:12.5px;line-height:1.5">Add a Postiz base URL and API key in <a href="/settings">Settings</a> to publish directly from here.</p>
+  {% else %}
+  <div style="display:flex;flex-wrap:wrap;gap:10px 16px;margin-bottom:12px">
+    {% for platform in publish_platforms %}
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+      <input type="checkbox" class="publish-platform-checkbox" value="{{ platform }}">
+      {{ platform | capitalize }}
+      <span class="publish-platform-status" data-platform="{{ platform }}" style="font-size:11.5px;color:var(--muted-light)">{% if platform in latest_publish_by_platform %}{% set pub = latest_publish_by_platform[platform] %}{% if pub.status == 'done' %}· published{% elif pub.status == 'error' %}· failed{% endif %}{% endif %}</span>
+    </label>
+    {% endfor %}
+  </div>
+  <div class="attachment-row" style="margin-bottom:10px">
+    <select id="social-video-source" class="social-video-source compact-field attachment-select">
+      <option value="">No video</option>
+      {% for opt in video_options %}
+      <option value="{{ opt.value }}" data-url="{{ opt.url }}" {% if opt.value == "clip:" ~ clip.id %}selected{% endif %}>{{ opt.label }}</option>
+      {% endfor %}
+      <option value="__upload_video__">Upload a video…</option>
+    </select>
+    <div id="social-video-preview" class="attachment-preview"></div>
+  </div>
+  <div class="attachment-row" style="margin-bottom:10px">
+    <select id="social-image-source" class="social-image-source compact-field attachment-select">
+      <option value="">No image</option>
+      <option value="__upload_image__">Upload an image…</option>
+    </select>
+    <div id="social-image-preview" class="attachment-preview"></div>
+  </div>
+  <div id="social-attachment-note" style="font-size:11.5px;color:var(--warn,#c2410c);margin-bottom:8px;display:none"></div>
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap">
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+      <input type="radio" name="publish-mode" value="now" checked> Post now
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+      <input type="radio" name="publish-mode" value="scheduled"> Schedule for…
+    </label>
+    <input type="datetime-local" id="publish-datetime-input" style="display:none">
+  </div>
+  <button type="button" class="btn btn-outline" id="publish-btn">Publish</button>
+  <div id="publish-status" style="font-size:13px;color:var(--muted);margin-top:8px"></div>
+  <p id="publish-hint" style="margin:6px 0 0;color:var(--muted-light);font-size:12.5px;{% if clip.exported_video_path %}display:none;{% endif %}">Pick a video to attach — Postiz needs a file to publish.</p>
+  {% endif %}
+</div>
+{% endif %}
 
 <div>
   <div class="field-caption">Download file name</div>

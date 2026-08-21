@@ -41,6 +41,16 @@ class Base(DeclarativeBase):
 def init_db() -> None:
     from app import models  # noqa: F401  (register models on Base.metadata)
 
+    # social_publishes shipped in two steps within the same unreleased feature: first with
+    # video_clip_id NOT NULL and no episode_id/job_id, then widened to also support
+    # episode-level publishes. create_all() never alters an existing table, so an install that
+    # already created the table under the old shape would keep failing on "no such column:
+    # social_publishes.episode_id" (and later, a NOT NULL violation on video_clip_id) forever.
+    # The table had no real usage under the old shape, so drop-and-let-create_all-rebuild is
+    # safe here — this is a one-time reset, not a pattern to repeat for tables with real data.
+    _reset_table_if_missing_column("social_publishes", "episode_id")
+    _rename_table_if_unique_column("video_clips", "soundbite_id", "video_clips_pre_multi")
+
     Base.metadata.create_all(bind=engine)
     _add_column_if_missing("feed_episode_suggestions", "suggested_keywords", "JSON DEFAULT '[]'")
     _add_column_if_missing("video_clips", "download_filename", "VARCHAR")
@@ -50,6 +60,53 @@ def init_db() -> None:
     _add_column_if_missing("feed_episode_suggestions", "used_transcript", "BOOLEAN DEFAULT 0")
     _add_column_if_missing("jobs", "steps", "JSON")
     _add_column_if_missing("jobs", "generated_script_id", "INTEGER REFERENCES generated_scripts(id)")
+    _add_column_if_missing("video_clips", "social_post", "TEXT DEFAULT ''")
+    _add_column_if_missing("video_clips", "youtube_title", "VARCHAR DEFAULT ''")
+    _drop_column_if_exists("video_clips", "caption")
+    _add_column_if_missing("jobs", "video_clip_id", "INTEGER REFERENCES video_clips(id)")
+    _copy_rows_and_drop("video_clips_pre_multi", "video_clips")
+
+
+def _reset_table_if_missing_column(table: str, required_column: str) -> None:
+    with engine.begin() as conn:
+        tables = {
+            row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
+        }
+        if table not in tables:
+            return
+        existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+        if required_column not in existing:
+            conn.exec_driver_sql(f"DROP TABLE {table}")
+
+
+def _rename_table_if_unique_column(table: str, column: str, rename_to: str) -> None:
+    # video_clips.soundbite_id shipped UNIQUE (one clip per soundbite); the "duplicate to a
+    # new video" feature needs several clips per soundbite. SQLite's ALTER TABLE can't drop a
+    # column constraint, so rename the old table out of the way here and let create_all()
+    # (called right after) build the new, non-unique-constrained table under that name;
+    # _copy_rows_and_drop then moves the existing rows across and removes the renamed table.
+    with engine.begin() as conn:
+        tables = {row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))}
+        if table not in tables:
+            return
+        for _seq, index_name, is_unique, *_rest in conn.exec_driver_sql(f"PRAGMA index_list({table})").fetchall():
+            if not is_unique:
+                continue
+            cols = [row[2] for row in conn.exec_driver_sql(f"PRAGMA index_info({index_name})")]
+            if cols == [column]:
+                conn.exec_driver_sql(f"ALTER TABLE {table} RENAME TO {rename_to}")
+                return
+
+
+def _copy_rows_and_drop(old_table: str, new_table: str) -> None:
+    with engine.begin() as conn:
+        tables = {row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (old_table,))}
+        if old_table not in tables:
+            return
+        columns = [row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({old_table})")]
+        col_list = ", ".join(columns)
+        conn.exec_driver_sql(f"INSERT INTO {new_table} ({col_list}) SELECT {col_list} FROM {old_table}")
+        conn.exec_driver_sql(f"DROP TABLE {old_table}")
 
 
 def _add_column_if_missing(table: str, column: str, ddl_type: str) -> None:
@@ -59,6 +116,13 @@ def _add_column_if_missing(table: str, column: str, ddl_type: str) -> None:
         existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
         if column not in existing:
             conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}")
+
+
+def _drop_column_if_exists(table: str, column: str) -> None:
+    with engine.begin() as conn:
+        existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+        if column in existing:
+            conn.exec_driver_sql(f"ALTER TABLE {table} DROP COLUMN {column}")
 
 
 def get_db() -> Generator[Session, None, None]:

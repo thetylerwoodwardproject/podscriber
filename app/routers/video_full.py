@@ -1,14 +1,14 @@
 import json
 
 from fastapi import APIRouter, Depends, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Episode, EpisodeVideo, Job
-from app.routers._shared import latest_job, recent_episodes, sanitize_download_filename, sse_job_stream
-from app.services import storage
+from app.models import Episode, EpisodeVideo
+from app.routers._shared import export_status_stream, recent_episodes, submit_and_track_job
 from app.services.jobs import submit_full_video_export
+from app.services.video_editor_shared import apply_clip_settings, download_response, save_clip_image
 from app.services.waveform import amplitude_envelope
 from app.templating import templates
 
@@ -61,30 +61,20 @@ def full_video_editor_page(episode_id: int, request: Request, db: Session = Depe
 async def upload_full_background_image(episode_id: int, file: UploadFile, db: Session = Depends(get_db)):
     episode = db.get(Episode, episode_id)
     video = _get_or_create_video(db, episode)
-    ext = (file.filename or "image.png").rsplit(".", 1)[-1].lower()
-    if ext not in ("png", "jpg", "jpeg", "webp"):
-        ext = "png"
-    dest = storage.images_dir(episode_id) / f"bg_full_{episode_id}.{ext}"
-    with open(dest, "wb") as f:
-        f.write(await file.read())
-    video.background_image_path = str(dest)
+    path, url = await save_clip_image(episode_id, file, f"bg_full_{episode_id}")
+    video.background_image_path = path
     db.commit()
-    return {"url": f"/media/uploads/{episode_id}/images/{dest.name}"}
+    return {"url": url}
 
 
 @router.post("/episodes/{episode_id}/video/logo")
 async def upload_full_logo_image(episode_id: int, file: UploadFile, db: Session = Depends(get_db)):
     episode = db.get(Episode, episode_id)
     video = _get_or_create_video(db, episode)
-    ext = (file.filename or "logo.png").rsplit(".", 1)[-1].lower()
-    if ext not in ("png", "jpg", "jpeg", "webp"):
-        ext = "png"
-    dest = storage.images_dir(episode_id) / f"logo_full_{episode_id}.{ext}"
-    with open(dest, "wb") as f:
-        f.write(await file.read())
-    video.logo_image_path = str(dest)
+    path, url = await save_clip_image(episode_id, file, f"logo_full_{episode_id}")
+    video.logo_image_path = path
     db.commit()
-    return {"url": f"/media/uploads/{episode_id}/images/{dest.name}"}
+    return {"url": url}
 
 
 @router.post("/episodes/{episode_id}/video/remove-image")
@@ -110,16 +100,9 @@ async def update_full_video_settings(episode_id: int, request: Request, db: Sess
     episode = db.get(Episode, episode_id)
     video = _get_or_create_video(db, episode)
     body = await request.json()
-    if "brightness" in body:
-        video.brightness = max(0.4, min(1.6, float(body["brightness"])))
-    if "waveform_offset_y" in body:
-        video.waveform_offset_y = max(-120, min(20, int(body["waveform_offset_y"])))
+    apply_clip_settings(video, body, waveform_offset_range=(-120, 20))
     if "caption" in body:
         video.caption = str(body["caption"])[:500]
-    if "waveform_color" in body:
-        video.waveform_color = str(body["waveform_color"])[:20]
-    if "download_filename" in body:
-        video.download_filename = str(body["download_filename"])[:80] or None
     db.commit()
     return {"ok": True}
 
@@ -128,28 +111,18 @@ async def update_full_video_settings(episode_id: int, request: Request, db: Sess
 def export_full_video(episode_id: int, db: Session = Depends(get_db)):
     episode = db.get(Episode, episode_id)
     _get_or_create_video(db, episode)
-    job = Job(episode_id=episode_id, job_type="video_export_full", status="pending")
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    submit_full_video_export(job.id)
-    return {"job_id": job.id}
+    return submit_and_track_job(
+        db, job_type="video_export_full", submit_fn=submit_full_video_export, episode_id=episode_id
+    )
 
 
 @router.get("/episodes/{episode_id}/video/status/stream")
 def full_video_status_stream(episode_id: int):
-    return sse_job_stream(
-        query_fn=lambda db: latest_job(db, "video_export_full", episode_id=episode_id),
-        payload_fn=lambda job: {"status": job.status, "progress_pct": job.progress_pct, "error_message": job.error_message},
-        not_found_payload={"status": "pending", "progress_pct": 0},
-    )
+    return export_status_stream("video_export_full", episode_id=episode_id)
 
 
 @router.get("/episodes/{episode_id}/video/download")
 def download_full_video(episode_id: int, db: Session = Depends(get_db)):
     episode = db.get(Episode, episode_id)
     video = episode.video if episode else None
-    if video is None or not video.exported_video_path:
-        return PlainTextResponse("No exported video yet.", status_code=404)
-    filename = sanitize_download_filename(video.download_filename, fallback=f"episode-{episode_id}")
-    return FileResponse(video.exported_video_path, filename=filename, media_type="video/mp4")
+    return download_response(video, fallback_stem=f"episode-{episode_id}")

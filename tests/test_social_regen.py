@@ -28,7 +28,7 @@ def _make_job(db, episode_id):
 
 class _FakeProvider:
     def generate_social_posts(self, transcript_text, description, tone="casual"):
-        return [SocialGroup(platform="X", initial="X", color="#111", posts=["p1", "p2", "p3", "p4"])]
+        return [SocialGroup(platform="X", initial="X", color="#111", platform_key="x", posts=["p1", "p2", "p3", "p4"])]
 
 
 class _FailingProvider:
@@ -49,7 +49,7 @@ def test_run_social_regenerate_success(db, monkeypatch):
 
     assert job.status == "done"
     assert episode.generated_content.social_posts == [
-        {"platform": "X", "initial": "X", "color": "#111", "posts": ["p1", "p2", "p3", "p4"]}
+        {"platform": "X", "initial": "X", "color": "#111", "platform_key": "x", "posts": ["p1", "p2", "p3", "p4"]}
     ]
     assert episode.status == "processed"  # unaffected by regeneration
 

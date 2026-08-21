@@ -15,6 +15,7 @@ class SocialGroup:
     platform: str
     initial: str
     color: str
+    platform_key: str = ""  # lowercase Postiz integration key, e.g. "x", "youtube"
     posts: list[str] = field(default_factory=list)
 
 
@@ -33,6 +34,20 @@ class SoundbiteCandidate:
 class ChapterCandidate:
     title: str
     start_quote: str
+
+
+@dataclass
+class ClipSocial:
+    social_post: str
+    youtube_title: str
+
+    def __post_init__(self):
+        self.youtube_title = _clamp_title(self.youtube_title, max_chars=99)
+        if not self.social_post.strip() or not self.youtube_title.strip():
+            # A model can return a schema-valid but empty response under load (seen with a
+            # large local Ollama model taking several minutes and coming back blank) — treat
+            # that as a failure rather than silently saving nothing and reporting success.
+            raise ValueError("Model returned an empty social post or YouTube title.")
 
 
 SEO_TITLE_MAX_CHARS = 60
@@ -66,10 +81,16 @@ class SeoSuggestion:
         self.title = _clamp_title(self.title)
 
 
+# (display_name, initial, color, postiz_key) — postiz_key matches app.services.postiz.PLATFORMS,
+# so a generated post can be published without a separate name-normalization step.
 SOCIAL_PLATFORMS = [
-    ("X", "X", "#111111"),
-    ("Instagram", "IG", "#c2185b"),
-    ("Threads", "T", "#3a352c"),
+    ("X", "X", "#111111", "x"),
+    ("Instagram", "IG", "#c2185b", "instagram"),
+    ("Threads", "T", "#3a352c", "threads"),
+    ("TikTok", "TT", "#000000", "tiktok"),
+    ("YouTube", "YT", "#ff0000", "youtube"),
+    ("Bluesky", "BS", "#1185fe", "bluesky"),
+    ("Facebook", "FB", "#1877f2", "facebook"),
 ]
 
 
@@ -78,6 +99,7 @@ class LLMProvider(Protocol):
     def generate_description_and_keywords(self, transcript_text: str) -> DescriptionAndKeywords: ...
     def generate_social_posts(self, transcript_text: str, description: str, tone: str = "casual") -> list[SocialGroup]: ...
     def select_soundbites(self, transcript_text: str) -> list[SoundbiteCandidate]: ...
+    def generate_clip_social(self, quote: str, episode_title: str) -> ClipSocial: ...
     def generate_chapters(self, transcript_text: str) -> list[ChapterCandidate]: ...
     def generate_seo_suggestion(
         self, title: str, description: str, transcript_text: str | None = None
@@ -110,16 +132,20 @@ class BaseLLMProvider:
     def generate_social_posts(self, transcript_text: str, description: str, tone: str = "casual") -> list[SocialGroup]:
         system, user, schema = prompts.social_posts_prompt(transcript_text, description, tone, self.custom_instructions)
         data = self._call(system, user, schema)
-        key_map = {"X": "x_posts", "Instagram": "instagram_posts", "Threads": "threads_posts"}
         return [
-            SocialGroup(platform=name, initial=initial, color=color, posts=data[key_map[name]])
-            for name, initial, color in SOCIAL_PLATFORMS
+            SocialGroup(platform=name, initial=initial, color=color, platform_key=key, posts=data[f"{key}_posts"])
+            for name, initial, color, key in SOCIAL_PLATFORMS
         ]
 
     def select_soundbites(self, transcript_text: str) -> list[SoundbiteCandidate]:
         system, user, schema = prompts.soundbites_prompt(transcript_text, self.custom_instructions)
         data = self._call(system, user, schema)
         return [SoundbiteCandidate(quote=s["quote"]) for s in data["soundbites"]]
+
+    def generate_clip_social(self, quote: str, episode_title: str) -> ClipSocial:
+        system, user, schema = prompts.clip_social_prompt(quote, episode_title, self.custom_instructions)
+        data = self._call(system, user, schema)
+        return ClipSocial(social_post=data["social_post"], youtube_title=data["youtube_title"])
 
     def generate_chapters(self, transcript_text: str) -> list[ChapterCandidate]:
         system, user, schema = prompts.chapters_prompt(transcript_text, self.custom_instructions)

@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
-from app.models import Chapter, Episode, GeneratedContent, Job, Soundbite, Transcript, TranscriptSegment
+from app.models import Chapter, Episode, GeneratedContent, Job, Soundbite, Transcript, TranscriptSegment, VideoClip
 from app.services import storage
 from app.services.llm.factory import get_llm_provider
 from app.services.soundbite_matching import match_quote_to_timestamps, quote_coverage
@@ -131,7 +131,13 @@ def run_episode_processing(job_id: int) -> None:
             _set_step(job, "social", db)
             social_groups = llm.generate_social_posts(transcript_text, content.description)
             content.social_posts = [
-                {"platform": g.platform, "initial": g.initial, "color": g.color, "posts": g.posts}
+                {
+                    "platform": g.platform,
+                    "initial": g.initial,
+                    "color": g.color,
+                    "platform_key": g.platform_key,
+                    "posts": g.posts,
+                }
                 for g in social_groups
             ]
             db.commit()
@@ -177,7 +183,7 @@ def run_episode_processing(job_id: int) -> None:
                 db.add(Chapter(episode_id=episode.id, index=i, title=title, start_ms=start_ms))
             db.commit()
 
-        # --- clip soundbite audio now that timestamps are known ---
+        # --- clip soundbite audio and pre-build its video clip now that timestamps are known ---
         from app.services.audio_clip import clip_soundbite_audio
 
         for sb in new_soundbites:
@@ -185,6 +191,18 @@ def run_episode_processing(job_id: int) -> None:
                 clip_soundbite_audio(episode, sb)
             except Exception:
                 pass  # a clipping failure shouldn't fail the whole pipeline; playback/download will just 404
+
+            # Pre-create the VideoClip and its social copy so the soundbite's video editor
+            # opens ready to adjust art/export, instead of requiring a manual "Create video"
+            # + "Generate" click first.
+            clip = VideoClip(soundbite_id=sb.id)
+            db.add(clip)
+            try:
+                clip_social = llm.generate_clip_social(sb.quote, episode.title or episode.original_filename)
+                clip.social_post = clip_social.social_post
+                clip.youtube_title = clip_social.youtube_title
+            except Exception:
+                pass  # clip stays with empty social copy; can be regenerated from the editor
         db.commit()
 
         job.status = "done"

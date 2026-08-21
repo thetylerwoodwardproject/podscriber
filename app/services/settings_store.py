@@ -24,6 +24,8 @@ DEFAULTS = {
     "local_whisper_model_size": "small",
     "custom_instructions": "",  # applied to every AI generation step: titles, description, social, soundbites, chapters
     "generator_custom_instructions": "",  # applied to every Generator script — separate from custom_instructions above
+    "postiz_base_url": "",  # e.g. https://postiz.example.com — self-hosted Postiz instance
+    "postiz_api_key": "",
 }
 
 

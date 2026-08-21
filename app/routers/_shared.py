@@ -62,6 +62,32 @@ def latest_job(db: Session, job_type: str, **filters) -> Job | None:
     return db.execute(select(Job).where(*conditions).order_by(Job.created_at.desc()).limit(1)).scalar_one_or_none()
 
 
+def submit_and_track_job(db: Session, *, job_type: str, submit_fn: Callable[[int], None], **job_fields) -> dict:
+    """Creates a pending Job row, hands its id to `submit_fn`, and returns `{"job_id": ...}`.
+
+    Collapses the create/commit/refresh/submit/return boilerplate that every export or
+    regenerate trigger route (video export, full-video export, social regenerate, clip
+    social regenerate, ...) would otherwise hand-write identically.
+    """
+    job = Job(job_type=job_type, status="pending", **job_fields)
+    db.add(job)
+    db.commit()
+    db.refresh(job)
+    submit_fn(job.id)
+    return {"job_id": job.id}
+
+
+def export_status_stream(job_type: str, **filters) -> StreamingResponse:
+    """The shared SSE shape for `{status, progress_pct, error_message}` export jobs
+    (video export, full-video export) — the two status-stream routes today differ only in
+    `job_type` and which id they filter `latest_job` on."""
+    return sse_job_stream(
+        query_fn=lambda db: latest_job(db, job_type, **filters),
+        payload_fn=lambda job: {"status": job.status, "progress_pct": job.progress_pct, "error_message": job.error_message},
+        not_found_payload={"status": "pending", "progress_pct": 0},
+    )
+
+
 def sse_job_stream(
     query_fn: Callable[[Session], Job | None],
     payload_fn: Callable[[Job], dict],

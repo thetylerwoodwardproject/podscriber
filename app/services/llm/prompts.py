@@ -171,13 +171,17 @@ def social_posts_prompt(
     system = (
         "You write social media posts promoting a podcast episode, tailored to each platform's "
         "tone: X (formerly Twitter) is terse and punchy, Instagram is warmer with emoji, "
-        "Threads is conversational and informal. " + tone_line
+        "Threads is conversational and informal, TikTok is short and punchy with trending-style "
+        "hashtags, YouTube reads like a community post or video description inviting people to "
+        "watch, Bluesky is conversational like X but without character-limit pressure, and "
+        "Facebook is warmer and longer-form, often posing a question to invite comments. " + tone_line
     )
     system = _with_custom_instructions(system, custom_instructions)
     user = (
         f"Episode transcript excerpt:\n\n{_truncated(transcript_text)}\n\n"
         f"Show notes:\n{description}\n\n"
-        "Write exactly 4 distinct post variants for each of X, Instagram, and Threads promoting this episode."
+        "Write exactly 4 distinct post variants for each of X, Instagram, Threads, TikTok, "
+        "YouTube, Bluesky, and Facebook promoting this episode."
     )
     schema = {
         "type": "object",
@@ -185,8 +189,20 @@ def social_posts_prompt(
             "x_posts": {"type": "array", "items": {"type": "string"}},
             "instagram_posts": {"type": "array", "items": {"type": "string"}},
             "threads_posts": {"type": "array", "items": {"type": "string"}},
+            "tiktok_posts": {"type": "array", "items": {"type": "string"}},
+            "youtube_posts": {"type": "array", "items": {"type": "string"}},
+            "bluesky_posts": {"type": "array", "items": {"type": "string"}},
+            "facebook_posts": {"type": "array", "items": {"type": "string"}},
         },
-        "required": ["x_posts", "instagram_posts", "threads_posts"],
+        "required": [
+            "x_posts",
+            "instagram_posts",
+            "threads_posts",
+            "tiktok_posts",
+            "youtube_posts",
+            "bluesky_posts",
+            "facebook_posts",
+        ],
         "additionalProperties": False,
     }
     return system, user, schema
@@ -220,6 +236,33 @@ def soundbites_prompt(transcript_text: str, custom_instructions: str = "") -> tu
             }
         },
         "required": ["soundbites"],
+        "additionalProperties": False,
+    }
+    return system, user, schema
+
+
+def clip_social_prompt(quote: str, episode_title: str, custom_instructions: str = "") -> tuple[str, str, dict]:
+    system = (
+        "You write the caption for a short vertical video clip (a podcast soundbite) that will be "
+        "posted as both a YouTube Short and a TikTok — write one post whose text works unchanged on "
+        "both platforms. Lead with a hook, keep it tight, and end with several relevant hashtags "
+        "(mix of broad and specific, no spaces inside a hashtag, no more than about 8). Also write a "
+        "short, punchy YouTube Shorts title under 100 characters that captures the hook of the clip. "
+        "Never use an em dash (—) or en dash (–)."
+    )
+    system = _with_custom_instructions(system, custom_instructions)
+    user = (
+        f"Podcast episode: {episode_title}\n\n"
+        f"Clip transcript (verbatim):\n{quote}\n\n"
+        "Write the social post text (with hashtags) and the YouTube title for this clip."
+    )
+    schema = {
+        "type": "object",
+        "properties": {
+            "social_post": {"type": "string"},
+            "youtube_title": {"type": "string"},
+        },
+        "required": ["social_post", "youtube_title"],
         "additionalProperties": False,
     }
     return system, user, schema

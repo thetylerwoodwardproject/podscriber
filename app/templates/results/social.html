@@ -74,5 +74,174 @@
         };
       });
   });
+
+  // --- Publish to Postiz — each post card has its own independent mode/datetime/video/image
+  // controls (there's no reason publishing 4 distinct post variants should force them all onto
+  // the same schedule or attachment). Cards live inside #social-posts-grid, which gets replaced
+  // wholesale after a regenerate, so listeners are delegated on document rather than bound
+  // per-element. ---
+  document.addEventListener("change", function (e) {
+    if (!e.target.classList.contains("social-publish-mode")) return;
+    var row = e.target.closest(".social-publish-row");
+    var dt = row && row.querySelector(".social-publish-datetime");
+    if (dt) dt.style.display = e.target.value === "scheduled" ? "inline-block" : "none";
+  });
+
+  function parseAttachmentSource(value) {
+    if (!value) return null;
+    if (value === "episode_video") return { type: "episode_video" };
+    if (value.indexOf("clip:") === 0) return { type: "clip", soundbite_id: parseInt(value.slice(5), 10) };
+    if (value.indexOf("upload:") === 0) return { type: "upload", attachment_id: parseInt(value.slice(7), 10) };
+    return null;
+  }
+
+  function uploadAttachment(file, kind, onDone, onError) {
+    var formData = new FormData();
+    formData.append("file", file);
+    formData.append("kind", kind);
+    fetch(base + "/social/attachments", { method: "POST", body: formData })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.ok === false) { onError(data.error || "Upload failed."); return; }
+        onDone(data.attachment);
+      })
+      .catch(function () { onError("Upload failed."); });
+  }
+
+  var attachmentFileInput = document.createElement("input");
+  attachmentFileInput.type = "file";
+  attachmentFileInput.style.display = "none";
+  document.body.appendChild(attachmentFileInput);
+  var pendingUpload = null;
+
+  function updateAttachmentPreview(select, kind) {
+    var row = select.closest(".attachment-row");
+    var previewEl = row ? row.querySelector(".attachment-preview") : null;
+    if (!previewEl) return;
+    var opt = select.options[select.selectedIndex];
+    var url = opt ? opt.getAttribute("data-url") : null;
+    previewEl.innerHTML = "";
+    if (!url) {
+      previewEl.classList.remove("attachment-preview-visible");
+      return;
+    }
+    var el = document.createElement(kind === "video" ? "video" : "img");
+    el.src = url;
+    if (kind === "video") { el.muted = true; el.setAttribute("playsinline", ""); }
+    previewEl.appendChild(el);
+    previewEl.classList.add("attachment-preview-visible");
+  }
+
+  document.addEventListener("change", function (e) {
+    var isVideo = e.target.classList.contains("social-video-source");
+    var isImage = e.target.classList.contains("social-image-source");
+    if (!isVideo && !isImage) return;
+    updateAttachmentPreview(e.target, isVideo ? "video" : "image");
+    var kind = isVideo ? "video" : "image";
+    if (e.target.value !== "__upload_" + kind + "__") return;
+    pendingUpload = { select: e.target, kind: kind };
+    attachmentFileInput.accept = kind === "image" ? "image/*" : "video/*";
+    attachmentFileInput.value = "";
+    attachmentFileInput.click();
+  });
+
+  attachmentFileInput.addEventListener("change", function () {
+    var file = attachmentFileInput.files[0];
+    var target = pendingUpload;
+    if (!file || !target) return;
+    uploadAttachment(
+      file,
+      target.kind,
+      function (attachment) {
+        var selector = target.kind === "video" ? ".social-video-source" : ".social-image-source";
+        document.querySelectorAll(selector).forEach(function (select) {
+          var option = document.createElement("option");
+          option.value = "upload:" + attachment.id;
+          option.textContent = attachment.filename;
+          option.setAttribute("data-url", attachment.url);
+          select.appendChild(option);
+        });
+        target.select.value = "upload:" + attachment.id;
+        updateAttachmentPreview(target.select, target.kind);
+        var note = target.select.closest(".social-publish-row").querySelector(".social-attachment-note");
+        if (target.kind === "image" && note) {
+          note.style.display = attachment.instagram_ok ? "none" : "block";
+          note.textContent = attachment.instagram_ok
+            ? ""
+            : "This image (" + attachment.width + "×" + attachment.height + ") doesn't fit Instagram's accepted range (4:5 to 1.91:1).";
+        }
+      },
+      function (message) {
+        target.select.value = "";
+        updateAttachmentPreview(target.select, target.kind);
+        var note = target.select.closest(".social-publish-row").querySelector(".social-attachment-note");
+        if (note) { note.style.display = "block"; note.textContent = message; }
+      }
+    );
+  });
+
+  document.addEventListener("click", function (e) {
+    var btn = e.target.closest(".social-publish-btn");
+    if (!btn) return;
+    var row = btn.closest(".social-publish-row");
+    var statusEl = row.querySelector(".social-publish-status");
+    var modeSelect = row.querySelector(".social-publish-mode");
+    var mode = modeSelect ? modeSelect.value : "now";
+    var scheduledAt = null;
+    if (mode === "scheduled") {
+      var dtInput = row.querySelector(".social-publish-datetime");
+      var dtVal = dtInput ? dtInput.value : "";
+      if (!dtVal) {
+        if (statusEl) statusEl.textContent = "Pick a date and time first.";
+        return;
+      }
+      scheduledAt = new Date(dtVal).toISOString();
+    }
+    var videoSelect = row.querySelector(".social-video-source");
+    var imageSelect = row.querySelector(".social-image-source");
+    var videoSource = parseAttachmentSource(videoSelect ? videoSelect.value : "");
+    var imageSource = parseAttachmentSource(imageSelect ? imageSelect.value : "");
+    var platform = btn.getAttribute("data-platform");
+    if (platform === "instagram" && !imageSource && !videoSource) {
+      if (statusEl) statusEl.textContent = "Instagram requires a video or an image attached to the post.";
+      return;
+    }
+    var selection = {
+      group_index: parseInt(btn.getAttribute("data-group-index"), 10),
+      post_index: parseInt(btn.getAttribute("data-post-index"), 10),
+      platform: platform,
+      video_source: videoSource,
+      image_source: imageSource,
+    };
+    btn.disabled = true;
+    if (statusEl) statusEl.textContent = "Publishing…";
+    fetch(base + "/social/publish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ selections: [selection], mode: mode, scheduled_at: scheduledAt }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.ok === false) {
+          if (statusEl) statusEl.textContent = data.error || "Couldn't publish.";
+          btn.disabled = false;
+          return;
+        }
+        PS.streamStatus(base + "/social/publish/status/stream", function (payload) {
+          if (payload.status === "running") {
+            if (statusEl) statusEl.textContent = "Publishing…";
+            return;
+          }
+          if (payload.status !== "done" && payload.status !== "error") return;
+          var pub = (payload.publishes || [])[0];
+          if (statusEl) {
+            statusEl.textContent = pub && pub.status === "done"
+              ? "Published."
+              : (pub && pub.error_message) || payload.error_message || "Failed.";
+          }
+          btn.disabled = false;
+        });
+      });
+  });
 })();
 </script>

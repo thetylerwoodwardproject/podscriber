@@ -36,4 +36,82 @@
       currentBtn = btn;
     });
   });
+
+  // --- Video variant picker ("Video 1"/"Video 2" dropdown + Edit) ---
+  Array.prototype.slice.call(document.querySelectorAll(".video-variant-edit-btn")).forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var select = btn.parentElement.querySelector(".video-variant-select");
+      var opt = select && select.options[select.selectedIndex];
+      if (opt) window.location.href = opt.getAttribute("data-url");
+    });
+  });
+
+  // --- Bulk "export selected" ---
+  var selectAllCb = document.getElementById("select-all-soundbites");
+  var exportSelectedBtn = document.getElementById("export-selected-btn");
+  var exportSelectedStatus = document.getElementById("export-selected-status");
+  var checkboxes = Array.prototype.slice.call(document.querySelectorAll(".soundbite-checkbox"));
+
+  function updateExportBtnState() {
+    if (!exportSelectedBtn) return;
+    exportSelectedBtn.disabled = !checkboxes.some(function (cb) { return cb.checked; });
+  }
+  checkboxes.forEach(function (cb) { cb.addEventListener("change", updateExportBtnState); });
+  if (selectAllCb) {
+    selectAllCb.addEventListener("change", function () {
+      checkboxes.forEach(function (cb) { cb.checked = selectAllCb.checked; });
+      updateExportBtnState();
+    });
+  }
+
+  if (exportSelectedBtn) {
+    exportSelectedBtn.addEventListener("click", function () {
+      var ids = checkboxes.filter(function (cb) { return cb.checked; }).map(function (cb) { return parseInt(cb.value, 10); });
+      if (!ids.length) return;
+      var episodeId = exportSelectedBtn.getAttribute("data-episode-id");
+      exportSelectedBtn.disabled = true;
+      exportSelectedStatus.textContent = "Starting " + ids.length + " export" + (ids.length > 1 ? "s" : "") + "…";
+
+      fetch("/episodes/" + episodeId + "/soundbites/video/export-selected", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ soundbite_ids: ids }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var jobs = data.jobs || [];
+          if (!jobs.length) {
+            exportSelectedStatus.textContent = "Nothing to export.";
+            exportSelectedBtn.disabled = false;
+            return;
+          }
+          var remaining = jobs.length;
+          var failed = 0;
+          jobs.forEach(function (j) {
+            var statusEl = document.querySelector('.soundbite-export-status[data-soundbite-id="' + j.soundbite_id + '"]');
+            if (statusEl) statusEl.textContent = "Queued…";
+            PS.streamStatus(
+              "/episodes/" + episodeId + "/soundbites/" + j.soundbite_id + "/video/" + j.clip_id + "/status/stream",
+              function (payload) {
+                if (statusEl) {
+                  if (payload.status === "running") statusEl.textContent = "Exporting… " + (payload.progress_pct || 0) + "%";
+                  else if (payload.status === "done") statusEl.textContent = "Done";
+                  else if (payload.status === "error") statusEl.textContent = "Failed";
+                }
+                if (payload.status === "done" || payload.status === "error") {
+                  remaining -= 1;
+                  if (payload.status === "error") failed += 1;
+                  if (remaining === 0) {
+                    exportSelectedStatus.textContent = failed
+                      ? (jobs.length - failed) + "/" + jobs.length + " exported (" + failed + " failed)"
+                      : "All " + jobs.length + " exported.";
+                    exportSelectedBtn.disabled = false;
+                  }
+                }
+              }
+            );
+          });
+        });
+    });
+  }
 })();

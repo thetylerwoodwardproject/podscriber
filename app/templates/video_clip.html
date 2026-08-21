@@ -5,7 +5,16 @@
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
   Soundbites
 </a>
-<h1 class="page-title" style="font-size:24px;margin-bottom:26px">Create vertical video</h1>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:26px;flex-wrap:wrap">
+  <h1 class="page-title" style="font-size:24px;margin:0">Create vertical video</h1>
+  <div style="display:flex;align-items:center;gap:10px">
+    {% if clip_count > 1 %}
+    <span style="font-size:12.5px;color:var(--muted-light)">Video {{ clip_index }} of {{ clip_count }}</span>
+    {% endif %}
+    <button type="button" class="btn btn-outline" id="duplicate-clip-btn" style="padding:7px 11px;font-size:12.5px">Duplicate to new video</button>
+    <span id="duplicate-clip-status" style="font-size:12.5px;color:var(--muted-light)"></span>
+  </div>
+</div>
 
 <div style="display:flex;gap:40px;flex-wrap:wrap">
   <div id="clip-frame" style="width:280px;height:498px;border-radius:20px;background:var(--faint);border:1px solid var(--border);position:relative;overflow:hidden;flex-shrink:0">
@@ -26,9 +35,10 @@
 
   <div style="flex:1;min-width:260px;max-width:380px;display:flex;flex-direction:column;gap:24px">
     {% set target = clip %}
+    {% set show_clip_social = true %}
     {% set export_label = "Export vertical video" %}
     {% set filename_placeholder = "soundbite-" ~ soundbite.id %}
-    {% set download_url = "/episodes/" ~ episode.id ~ "/soundbites/" ~ soundbite.id ~ "/video/download" %}
+    {% set download_url = "/episodes/" ~ episode.id ~ "/soundbites/" ~ soundbite.id ~ "/video/" ~ clip.id ~ "/download" %}
     {% include "_video_editor_controls.html" %}
   </div>
 </div>
@@ -36,7 +46,8 @@
 {% block scripts %}
 <script>
 window.PODSCRIBER_CLIP = {
-  base: "/episodes/{{ episode.id }}/soundbites/{{ soundbite.id }}/video",
+  base: "/episodes/{{ episode.id }}/soundbites/{{ soundbite.id }}/video/{{ clip.id }}",
+  episodeId: {{ episode.id }},
   envelope: {{ envelope_json | safe }},
   waveformColor: {{ clip.waveform_color | tojson }},
   waveformOffsetY: {{ clip.waveform_offset_y }},

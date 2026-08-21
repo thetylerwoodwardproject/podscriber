@@ -1,17 +1,31 @@
 import shutil
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.config import config
 from app.db import get_db
-from app.models import Chapter, Episode, Job, Soundbite
-from app.routers._shared import latest_job, recent_episodes, sse_job_stream
+from app.models import Chapter, Episode, SocialAttachment, Soundbite
+from app.routers._shared import latest_job, recent_episodes, sse_job_stream, submit_and_track_job
+from app.services import settings_store, storage
 from app.services.chapters_export import build_chapters_json
-from app.services.jobs import submit_social_regenerate
+from app.services.jobs import submit_episode_social_publish, submit_social_regenerate
 from app.services.llm.factory import get_llm_provider
 from app.services.llm.prompts import SOCIAL_TONES
+from app.services.postiz import PLATFORMS
+from app.services.social_attachments import (
+    ALLOWED_ATTACHMENT_IMAGE_EXTENSIONS,
+    ALLOWED_ATTACHMENT_VIDEO_EXTENSIONS,
+    decode_image_dimensions,
+    episode_video_options,
+    guess_content_type,
+    instagram_image_ok,
+    resolve_image_attachment,
+    resolve_video_source,
+    validate_instagram_requirement,
+)
 from app.services.vtt import build_vtt
 from app.templating import templates
 
@@ -72,6 +86,8 @@ def results_page(episode_id: int, request: Request, tab: str = "titles", db: Ses
         "active_tab": tab,
         "last_error": last_error,
         "social_tones": SOCIAL_TONES,
+        "postiz_configured": bool(settings_store.get(db, "postiz_base_url") and settings_store.get(db, "postiz_api_key")),
+        "video_options": episode_video_options(episode),
     }
     return templates.TemplateResponse(request, "results.html", context)
 
@@ -158,12 +174,12 @@ def edit_social_post(episode_id: int, group_index: int, post_index: int, text: s
 @router.post("/episodes/{episode_id}/social/regenerate")
 def regenerate_social_posts(episode_id: int, tone: str = Form("casual"), db: Session = Depends(get_db)):
     _get_or_404(db, episode_id)
-    job = Job(episode_id=episode_id, job_type="social_regenerate", status="pending")
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    submit_social_regenerate(job.id, tone)
-    return {"job_id": job.id}
+    return submit_and_track_job(
+        db,
+        job_type="social_regenerate",
+        submit_fn=lambda job_id: submit_social_regenerate(job_id, tone),
+        episode_id=episode_id,
+    )
 
 
 @router.get("/episodes/{episode_id}/social/regenerate/status/stream")
@@ -178,8 +194,141 @@ def social_regenerate_status_stream(episode_id: int):
 @router.get("/episodes/{episode_id}/social/posts-fragment", response_class=HTMLResponse)
 def social_posts_fragment(episode_id: int, request: Request, db: Session = Depends(get_db)):
     episode = _get_or_404(db, episode_id)
-    context = {"episode": episode, "content": episode.generated_content}
+    context = {
+        "episode": episode,
+        "content": episode.generated_content,
+        "postiz_configured": bool(settings_store.get(db, "postiz_base_url") and settings_store.get(db, "postiz_api_key")),
+        "video_options": episode_video_options(episode),
+    }
     return templates.TemplateResponse(request, "results/_social_posts_grid.html", context)
+
+
+@router.post("/episodes/{episode_id}/social/attachments")
+async def upload_social_attachment(
+    episode_id: int, file: UploadFile, kind: str = Form(...), db: Session = Depends(get_db)
+):
+    episode = _get_or_404(db, episode_id)
+    if kind not in ("video", "image"):
+        return {"ok": False, "error": "Unsupported attachment kind."}
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
+    allowed = ALLOWED_ATTACHMENT_IMAGE_EXTENSIONS if kind == "image" else ALLOWED_ATTACHMENT_VIDEO_EXTENSIONS
+    if ext not in allowed:
+        return {"ok": False, "error": f"Unsupported file type: .{ext}"}
+
+    content = await file.read()
+    if len(content) > config.max_upload_bytes:
+        return {"ok": False, "error": "File is too large."}
+
+    dest_name = f"{uuid4().hex}_{storage.safe_filename(file.filename or f'upload.{ext}')}"
+    dest = storage.social_attachments_dir(episode_id) / dest_name
+    with open(dest, "wb") as f:
+        f.write(content)
+
+    width = height = None
+    if kind == "image":
+        try:
+            width, height = decode_image_dimensions(str(dest))
+        except ValueError as exc:
+            dest.unlink(missing_ok=True)
+            return {"ok": False, "error": str(exc)}
+
+    attachment = SocialAttachment(
+        episode_id=episode.id,
+        kind=kind,
+        file_path=str(dest),
+        original_filename=file.filename or dest.name,
+        content_type=guess_content_type(dest.name),
+        width=width,
+        height=height,
+    )
+    db.add(attachment)
+    db.commit()
+    db.refresh(attachment)
+
+    payload = {
+        "id": attachment.id,
+        "kind": kind,
+        "url": f"/media/uploads/{episode_id}/social/{dest.name}",
+        "filename": attachment.original_filename,
+        "width": width,
+        "height": height,
+    }
+    if kind == "image":
+        payload["instagram_ok"] = instagram_image_ok(width, height)
+    return {"ok": True, "attachment": payload}
+
+
+@router.post("/episodes/{episode_id}/social/publish")
+async def publish_social_posts(episode_id: int, request: Request, db: Session = Depends(get_db)):
+    episode = _get_or_404(db, episode_id)
+    body = await request.json()
+    selections = []
+    for sel in body.get("selections", []):
+        if sel.get("platform") not in PLATFORMS:
+            continue
+        try:
+            group_index = int(sel["group_index"])
+            post_index = int(sel["post_index"])
+            platform = sel["platform"]
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        video_source = sel.get("video_source") if isinstance(sel.get("video_source"), dict) else None
+        image_source = sel.get("image_source") if isinstance(sel.get("image_source"), dict) else None
+
+        video_path, video_err = resolve_video_source(db, episode, video_source)
+        if video_source and video_err:
+            return {"ok": False, "error": video_err}
+        image_attachment, image_err = resolve_image_attachment(db, episode, image_source)
+        if image_source and image_err:
+            return {"ok": False, "error": image_err}
+        instagram_err = validate_instagram_requirement([platform], image_attachment, has_video=bool(video_path))
+        if instagram_err:
+            return {"ok": False, "error": instagram_err}
+
+        selections.append(
+            {
+                "group_index": group_index,
+                "post_index": post_index,
+                "platform": platform,
+                "video_source": video_source,
+                "image_source": image_source,
+            }
+        )
+    mode = "scheduled" if body.get("mode") == "scheduled" else "now"
+    scheduled_at = str(body["scheduled_at"]) if mode == "scheduled" and body.get("scheduled_at") else None
+    if not selections or (mode == "scheduled" and not scheduled_at):
+        return {"ok": False, "error": "Nothing to publish (or missing a scheduled date/time)."}
+    return submit_and_track_job(
+        db,
+        job_type="episode_social_publish",
+        submit_fn=lambda job_id: submit_episode_social_publish(job_id, selections, mode, scheduled_at),
+        episode_id=episode_id,
+    )
+
+
+@router.get("/episodes/{episode_id}/social/publish/status/stream")
+def social_publish_status_stream(episode_id: int):
+    def payload_fn(job) -> dict:
+        payload = {"status": job.status, "error_message": job.error_message}
+        if job.status in ("done", "error"):
+            payload["publishes"] = [
+                {
+                    "platform": pub.platform,
+                    "status": pub.status,
+                    "error_message": pub.error_message,
+                    "postiz_post_id": pub.postiz_post_id,
+                    "scheduled_at": pub.scheduled_at.isoformat() if pub.scheduled_at else None,
+                }
+                for pub in job.social_publishes
+            ]
+        return payload
+
+    return sse_job_stream(
+        query_fn=lambda db: latest_job(db, "episode_social_publish", episode_id=episode_id),
+        payload_fn=payload_fn,
+        not_found_payload={"status": "pending"},
+    )
 
 
 # ---- Keywords ----

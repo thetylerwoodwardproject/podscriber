@@ -35,3 +35,9 @@ def video_dir(episode_id: int) -> Path:
     d = episode_dir(episode_id) / "video"
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def social_attachments_dir(episode_id: int) -> Path:
+    d = episode_dir(episode_id) / "social"
+    d.mkdir(parents=True, exist_ok=True)
+    return d

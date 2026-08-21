@@ -45,7 +45,7 @@
     var file = bgFileInput.files[0];
     if (!file) return;
     uploadImage(file, "/image", function (data) {
-      bgLayer.style.backgroundImage = "url('" + data.url + "')";
+      bgLayer.style.backgroundImage = "url('" + data.url + "?v=" + Date.now() + "')";
       if (uploadHint) uploadHint.style.display = "none";
       document.getElementById("remove-bg-btn").style.display = "inline-flex";
     });
@@ -66,7 +66,7 @@
     var file = logoFileInput.files[0];
     if (!file) return;
     uploadImage(file, "/logo", function (data) {
-      logoImg.style.backgroundImage = "url('" + data.url + "')";
+      logoImg.style.backgroundImage = "url('" + data.url + "?v=" + Date.now() + "')";
       logoLayer.style.display = "flex";
       document.getElementById("remove-logo-btn").style.display = "inline-flex";
     });
@@ -109,11 +109,255 @@
     setWaveformColor(val);
   });
 
-  // --- Caption ---
+  // --- Caption (full-episode video only) ---
   var captionInput = document.getElementById("caption-input");
-  captionInput.addEventListener("change", function () {
-    saveSettings({ caption: captionInput.value });
+  if (captionInput) {
+    captionInput.addEventListener("change", function () {
+      saveSettings({ caption: captionInput.value });
+    });
+  }
+
+  // --- Social post + YouTube title (soundbite video only) ---
+  var socialPostInput = document.getElementById("social-post-input");
+  if (socialPostInput) {
+    socialPostInput.addEventListener("change", function () {
+      saveSettings({ social_post: socialPostInput.value });
+    });
+  }
+
+  var youtubeTitleInput = document.getElementById("youtube-title-input");
+  var youtubeTitleCount = document.getElementById("youtube-title-count");
+  if (youtubeTitleInput) {
+    youtubeTitleInput.addEventListener("input", function () {
+      youtubeTitleCount.textContent = youtubeTitleInput.value.length + "/99";
+    });
+    youtubeTitleInput.addEventListener("change", function () {
+      saveSettings({ youtube_title: youtubeTitleInput.value });
+    });
+  }
+
+  var socialRegenBtn = document.getElementById("social-regen-btn");
+  if (socialRegenBtn) {
+    var socialRegenStatus = document.getElementById("social-regen-status");
+    socialRegenBtn.addEventListener("click", function () {
+      socialRegenBtn.disabled = true;
+      socialRegenStatus.textContent = "Generating…";
+      fetch(base + "/social/regenerate", { method: "POST" })
+        .then(function (r) { return r.json(); })
+        .then(function () {
+          PS.streamStatus(base + "/social/status/stream", function (payload) {
+            if (payload.status === "done") {
+              socialPostInput.value = payload.social_post || "";
+              if (youtubeTitleInput && !youtubeTitleInput.value) {
+                youtubeTitleInput.value = payload.youtube_title || "";
+                if (youtubeTitleCount) youtubeTitleCount.textContent = youtubeTitleInput.value.length + "/99";
+              }
+              socialRegenStatus.textContent = "Includes hashtags — same text works for both platforms.";
+              socialRegenBtn.style.display = "none";
+            } else if (payload.status === "error") {
+              socialRegenStatus.textContent = "Couldn't generate — check your text-generation provider in Settings.";
+              socialRegenBtn.disabled = false;
+            }
+          });
+        });
+    });
+  }
+
+  // --- Attach video/image to the Postiz publish (shared upload + option-population logic) ---
+  function parseAttachmentSource(value) {
+    if (!value) return null;
+    if (value === "episode_video") return { type: "episode_video" };
+    if (value.indexOf("clip:") === 0) return { type: "clip", clip_id: parseInt(value.slice(5), 10) };
+    if (value.indexOf("upload:") === 0) return { type: "upload", attachment_id: parseInt(value.slice(7), 10) };
+    return null;
+  }
+
+  function uploadAttachment(file, kind, onDone, onError) {
+    var formData = new FormData();
+    formData.append("file", file);
+    formData.append("kind", kind);
+    fetch("/episodes/" + cfg.episodeId + "/social/attachments", { method: "POST", body: formData })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.ok === false) { onError(data.error || "Upload failed."); return; }
+        onDone(data.attachment);
+      })
+      .catch(function () { onError("Upload failed."); });
+  }
+
+  var videoSourceSelect = document.getElementById("social-video-source");
+  var imageSourceSelect = document.getElementById("social-image-source");
+  var videoPreview = document.getElementById("social-video-preview");
+  var imagePreview = document.getElementById("social-image-preview");
+  var attachmentNote = document.getElementById("social-attachment-note");
+  var attachmentFileInput = document.createElement("input");
+  attachmentFileInput.type = "file";
+  attachmentFileInput.style.display = "none";
+  document.body.appendChild(attachmentFileInput);
+  var pendingUploadSelect = null;
+
+  function previewElFor(kind) { return kind === "video" ? videoPreview : imagePreview; }
+
+  function updateAttachmentPreview(select, kind) {
+    var previewEl = previewElFor(kind);
+    if (!previewEl) return;
+    var opt = select.options[select.selectedIndex];
+    var url = opt ? opt.getAttribute("data-url") : null;
+    previewEl.innerHTML = "";
+    if (!url) {
+      previewEl.classList.remove("attachment-preview-visible");
+      return;
+    }
+    var el = document.createElement(kind === "video" ? "video" : "img");
+    el.src = url;
+    if (kind === "video") { el.muted = true; el.setAttribute("playsinline", ""); }
+    previewEl.appendChild(el);
+    previewEl.classList.add("attachment-preview-visible");
+  }
+
+  function handleSourceSelectChange(select, kind) {
+    if (select.value === "__upload_" + kind + "__") {
+      pendingUploadSelect = { select: select, kind: kind };
+      attachmentFileInput.accept = kind === "image" ? "image/*" : "video/*";
+      attachmentFileInput.value = "";
+      attachmentFileInput.click();
+    }
+  }
+  if (videoSourceSelect) {
+    videoSourceSelect.addEventListener("change", function () {
+      handleSourceSelectChange(videoSourceSelect, "video");
+      updateAttachmentPreview(videoSourceSelect, "video");
+      updatePublishHint();
+    });
+    updateAttachmentPreview(videoSourceSelect, "video");
+  }
+  if (imageSourceSelect) {
+    imageSourceSelect.addEventListener("change", function () {
+      handleSourceSelectChange(imageSourceSelect, "image");
+      updateAttachmentPreview(imageSourceSelect, "image");
+    });
+    updateAttachmentPreview(imageSourceSelect, "image");
+  }
+  attachmentFileInput.addEventListener("change", function () {
+    var file = attachmentFileInput.files[0];
+    var target = pendingUploadSelect;
+    if (!file || !target) return;
+    uploadAttachment(
+      file,
+      target.kind,
+      function (attachment) {
+        var option = document.createElement("option");
+        option.value = "upload:" + attachment.id;
+        option.textContent = attachment.filename;
+        option.setAttribute("data-url", attachment.url);
+        target.select.appendChild(option);
+        target.select.value = option.value;
+        updateAttachmentPreview(target.select, target.kind);
+        if (target.kind === "image" && attachmentNote) {
+          attachmentNote.style.display = attachment.instagram_ok ? "none" : "block";
+          attachmentNote.textContent = attachment.instagram_ok
+            ? ""
+            : "This image (" + attachment.width + "×" + attachment.height + ") doesn't fit Instagram's accepted range (4:5 to 1.91:1).";
+        }
+        updatePublishHint();
+      },
+      function (message) {
+        target.select.value = "";
+        updateAttachmentPreview(target.select, target.kind);
+        if (attachmentNote) { attachmentNote.style.display = "block"; attachmentNote.textContent = message; }
+      }
+    );
   });
+
+  var publishHint = document.getElementById("publish-hint");
+  function updatePublishHint() {
+    if (!publishHint || !videoSourceSelect) return;
+    publishHint.style.display = videoSourceSelect.value ? "none" : "block";
+  }
+  updatePublishHint();
+
+  // --- Publish to Postiz ---
+  var publishBtn = document.getElementById("publish-btn");
+  if (publishBtn) {
+    var publishStatus = document.getElementById("publish-status");
+    var publishDatetimeInput = document.getElementById("publish-datetime-input");
+
+    function updatePublishModeUI() {
+      var scheduled = document.querySelector('input[name="publish-mode"][value="scheduled"]').checked;
+      publishDatetimeInput.style.display = scheduled ? "inline-block" : "none";
+    }
+    document.querySelectorAll('input[name="publish-mode"]').forEach(function (radio) {
+      radio.addEventListener("change", updatePublishModeUI);
+    });
+    updatePublishModeUI();
+
+    publishBtn.addEventListener("click", function () {
+      var platforms = Array.prototype.slice
+        .call(document.querySelectorAll(".publish-platform-checkbox:checked"))
+        .map(function (cb) { return cb.value; });
+      if (!platforms.length) {
+        publishStatus.textContent = "Select at least one platform.";
+        return;
+      }
+      var videoSource = parseAttachmentSource(videoSourceSelect ? videoSourceSelect.value : "");
+      if (!videoSource) {
+        publishStatus.textContent = "Pick a video to attach.";
+        return;
+      }
+      var imageSource = parseAttachmentSource(imageSourceSelect ? imageSourceSelect.value : "");
+      var mode = document.querySelector('input[name="publish-mode"]:checked').value;
+      var scheduledAt = null;
+      if (mode === "scheduled") {
+        if (!publishDatetimeInput.value) {
+          publishStatus.textContent = "Pick a date and time.";
+          return;
+        }
+        scheduledAt = new Date(publishDatetimeInput.value).toISOString();
+      }
+      publishBtn.disabled = true;
+      publishStatus.textContent = "Publishing…";
+      fetch(base + "/social/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platforms: platforms,
+          mode: mode,
+          scheduled_at: scheduledAt,
+          video_source: videoSource,
+          image_source: imageSource,
+        }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.ok === false) {
+            publishStatus.textContent = data.error || "Couldn't publish.";
+            publishBtn.disabled = false;
+            return;
+          }
+          PS.streamStatus(base + "/social/publish/status/stream", function (payload) {
+            if (payload.status === "running") {
+              publishStatus.textContent = "Publishing…";
+              return;
+            }
+            if (payload.status !== "done" && payload.status !== "error") return;
+            var results = payload.publishes || [];
+            results.forEach(function (r) {
+              var el = document.querySelector('.publish-platform-status[data-platform="' + r.platform + '"]');
+              if (el) {
+                el.textContent = r.status === "done"
+                  ? "· published"
+                  : "· failed" + (r.error_message ? " — " + r.error_message : "");
+              }
+            });
+            var okCount = results.filter(function (r) { return r.status === "done"; }).length;
+            publishStatus.textContent = results.length && okCount === results.length
+              ? "Published to " + okCount + " platform" + (okCount > 1 ? "s" : "") + "."
+              : okCount + "/" + results.length + " succeeded" + (payload.error_message ? " — " + payload.error_message : "");
+            publishBtn.disabled = false;
+          });
+        });
+    });
+  }
 
   // --- Download file name ---
   var filenameInput = document.getElementById("filename-input");
@@ -170,4 +414,28 @@
         });
       });
   });
+
+  // --- Duplicate to a new video variant ---
+  var duplicateBtn = document.getElementById("duplicate-clip-btn");
+  var duplicateStatus = document.getElementById("duplicate-clip-status");
+  if (duplicateBtn) {
+    duplicateBtn.addEventListener("click", function () {
+      duplicateBtn.disabled = true;
+      duplicateStatus.textContent = "Duplicating…";
+      fetch(base + "/duplicate", { method: "POST" })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data.ok === false) {
+            duplicateStatus.textContent = data.error || "Couldn't duplicate.";
+            duplicateBtn.disabled = false;
+            return;
+          }
+          window.location.href = data.url;
+        })
+        .catch(function () {
+          duplicateStatus.textContent = "Couldn't duplicate.";
+          duplicateBtn.disabled = false;
+        });
+    });
+  }
 })();

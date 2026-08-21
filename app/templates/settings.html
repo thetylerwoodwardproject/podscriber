@@ -140,6 +140,19 @@
     <input type="password" name="op3_api_key" value="{{ s.op3_api_key }}" placeholder="••••••••••••" style="width:100%">
   </div>
 
+  <div class="settings-card" id="postiz">
+    <div class="settings-card-header">
+      <span class="sora" style="font-size:15.5px">Postiz</span>
+      {{ status_pill(s.postiz_base_url and s.postiz_api_key, 'Connected' if (s.postiz_base_url and s.postiz_api_key) else 'Not connected') }}
+    </div>
+    <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Publishes video clips straight to Postiz (TikTok, YouTube, X, Instagram, Bluesky, Threads, Facebook) from a soundbite's video editor.</p>
+    <label class="field-label">Postiz base URL</label>
+    <input type="url" name="postiz_base_url" value="{{ s.postiz_base_url }}" placeholder="https://postiz.example.com/api" style="width:100%">
+    <label class="field-label">Postiz API key</label>
+    <input type="password" name="postiz_api_key" value="{{ s.postiz_api_key }}" placeholder="••••••••••••" style="width:100%">
+    <p style="margin:6px 0 0;color:var(--muted-light);font-size:12px">Use your Postiz <strong>backend/API</strong> URL, not the app you log into in your browser — for self-hosted Postiz this is usually the same domain with <code>/api</code> appended (<code>NEXT_PUBLIC_BACKEND_URL</code> in your Postiz config). Postiz Cloud users: <code>https://api.postiz.com</code>.</p>
+  </div>
+
   <div class="settings-card" id="generator">
     <div class="settings-card-header">
       <span class="sora" style="font-size:15.5px">Script Generator</span>
