@@ -47,7 +47,6 @@ def save_settings(
     transcription_provider: str = Form("local"),
     local_whisper_model_size: str = Form("small"),
     custom_instructions: str = Form(""),
-    generator_custom_instructions: str = Form(""),
     postiz_base_url: str = Form(""),
     postiz_api_key: str = Form(""),
     db: Session = Depends(get_db),
@@ -79,7 +78,6 @@ def save_settings(
         "transcription_provider": transcription_provider,
         "local_whisper_model_size": local_whisper_model_size,
         "custom_instructions": custom_instructions.strip(),
-        "generator_custom_instructions": generator_custom_instructions.strip(),
         "postiz_base_url": postiz_base_url.strip().rstrip("/"),
         "postiz_api_key": postiz_api_key.strip(),
     }

@@ -59,9 +59,8 @@ apt package, so `python3 -m venv` alone can't run ensurepip). If `.venv` ever ne
   directly from its POST handler.** Doing so leaves the browser on a POST-originated URL, and
   refreshing it triggers a "Confirm Form Resubmission" prompt — the user must never be made to see
   that or lose the page. Every such POST handler must end with `RedirectResponse(url=..., status_code=303)`
-  to a GET route (Post/Redirect/Get), e.g. `generator.py`'s `generate_script` →
-  `/generator/{script.id}`, or `results.py`'s `delete_episode` → `/`. This applies under all
-  circumstances, with no exceptions. The only forms allowed to return a rendered template/fragment
+  to a GET route (Post/Redirect/Get), e.g. `results.py`'s `delete_episode` → `/`. This applies
+  under all circumstances, with no exceptions. The only forms allowed to return a rendered template/fragment
   or JSON straight from POST are ones marked `data-ajax` (handled via `fetch` by `app/static/js/app.js`,
   never a real page navigation) or ones with their own custom `fetch`-based JS handler that calls
   `e.preventDefault()` before submit (e.g. `analytics.js`'s `#stats-refresh-form`, `improvements.js`'s

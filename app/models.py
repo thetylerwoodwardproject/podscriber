@@ -59,8 +59,7 @@ class Job(TimestampMixin, Base):
     # on one specific variant (export, clip social regenerate/publish) record it here so a
     # status-stream poll for variant B doesn't pick up variant A's more-recently-created job.
     video_clip_id: Mapped[int | None] = mapped_column(ForeignKey("video_clips.id"), nullable=True)
-    generated_script_id: Mapped[int | None] = mapped_column(ForeignKey("generated_scripts.id"), nullable=True)
-    job_type: Mapped[str] = mapped_column(String)  # episode_processing|video_export|script_generate
+    job_type: Mapped[str] = mapped_column(String)  # episode_processing|video_export
     status: Mapped[str] = mapped_column(String, default="pending")  # pending|running|done|error
     steps: Mapped[list | None] = mapped_column(JSON, nullable=True)  # episode_processing: selected STEP_KEYS
     current_step: Mapped[str] = mapped_column(String, default="")
@@ -226,17 +225,6 @@ class Chapter(Base):
     start_ms: Mapped[int] = mapped_column(Integer)
 
     episode: Mapped["Episode"] = relationship(back_populates="chapters")
-
-
-class GeneratedScript(TimestampMixin, Base):
-    __tablename__ = "generated_scripts"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    topic: Mapped[str] = mapped_column(String, default="")
-    research_text: Mapped[str] = mapped_column(Text, default="")
-    outline: Mapped[list] = mapped_column(JSON, default=list)  # [str]
-    script_text: Mapped[str] = mapped_column(Text, default="")
-    llm_provider: Mapped[str] = mapped_column(String, default="")
 
 
 class FeedEpisodeSuggestion(Base):

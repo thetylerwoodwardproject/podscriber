@@ -66,12 +66,6 @@ def _clamp_title(title: str, max_chars: int = SEO_TITLE_MAX_CHARS) -> str:
 
 
 @dataclass
-class ScriptResult:
-    outline: list[str]
-    script: str
-
-
-@dataclass
 class SeoSuggestion:
     title: str
     description: str
@@ -104,9 +98,6 @@ class LLMProvider(Protocol):
     def generate_seo_suggestion(
         self, title: str, description: str, transcript_text: str | None = None
     ) -> SeoSuggestion: ...
-    def generate_script(
-        self, topic: str, research: str, style_excerpts: str, custom_instructions: str = ""
-    ) -> ScriptResult: ...
 
 
 class BaseLLMProvider:
@@ -160,10 +151,3 @@ class BaseLLMProvider:
         )
         data = self._call(system, user, schema)
         return SeoSuggestion(title=data["title"], description=data["description"], keywords=data["keywords"])
-
-    def generate_script(
-        self, topic: str, research: str, style_excerpts: str, custom_instructions: str = ""
-    ) -> ScriptResult:
-        system, user, schema = prompts.script_prompt(topic, research, style_excerpts, custom_instructions)
-        data = self._call(system, user, schema)
-        return ScriptResult(outline=data["outline"], script=data["script"])

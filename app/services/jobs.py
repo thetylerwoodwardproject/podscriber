@@ -98,14 +98,6 @@ def submit_episode_social_publish(job_id: int, selections: list[dict], mode: str
     submit_job(job_id, run_episode_social_publish, selections, mode, scheduled_at, guarded=False)
 
 
-def submit_script_generation(job_id: int) -> None:
-    from app.services.script_generate import run_script_generation
-
-    # A one-off LLM call, not CPU-bound like transcription, so it shares the 3-worker
-    # executor rather than the dedicated single-worker episode executor.
-    submit_job(job_id, run_script_generation)
-
-
 def submit_feed_seo_bulk(job_id: int) -> None:
     from app.services.feed_seo import run_feed_seo_bulk
 

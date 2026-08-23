@@ -153,15 +153,6 @@
     <p style="margin:6px 0 0;color:var(--muted-light);font-size:12px">Use your Postiz <strong>backend/API</strong> URL, not the app you log into in your browser — for self-hosted Postiz this is usually the same domain with <code>/api</code> appended (<code>NEXT_PUBLIC_BACKEND_URL</code> in your Postiz config). Postiz Cloud users: <code>https://api.postiz.com</code>.</p>
   </div>
 
-  <div class="settings-card" id="generator">
-    <div class="settings-card-header">
-      <span class="sora" style="font-size:15.5px">Script Generator</span>
-    </div>
-    <p style="margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.5">Applied to every script the Generator writes, so scripts stay consistent with your show's voice — separate from the custom instructions above, which only apply to per-episode content.</p>
-    <label class="field-label">Generator tone instructions</label>
-    <textarea name="generator_custom_instructions" rows="4" placeholder="e.g. Open with a cold-open hook before any intro music cue, write in second person, close every episode with a call to action.">{{ s.generator_custom_instructions }}</textarea>
-  </div>
-
   <div style="display:flex;gap:10px;align-items:center;margin-top:26px">
     <button type="submit" class="btn btn-primary">Save settings</button>
   </div>

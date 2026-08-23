@@ -34,7 +34,6 @@ def health() -> dict:
 
 from app.routers import (  # noqa: E402
     analytics,
-    generator,
     improvements,
     library,
     processing,
@@ -54,4 +53,3 @@ app.include_router(video_full.router)
 app.include_router(settings.router)
 app.include_router(analytics.router)
 app.include_router(improvements.router)
-app.include_router(generator.router)

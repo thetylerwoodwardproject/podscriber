@@ -268,44 +268,6 @@ def clip_social_prompt(quote: str, episode_title: str, custom_instructions: str 
     return system, user, schema
 
 
-def script_prompt(
-    topic: str, research: str, style_excerpts: str, custom_instructions: str = ""
-) -> tuple[str, str, dict]:
-    system = (
-        "You write full podcast episode scripts from scratch: a structural outline followed by a "
-        "complete word-by-word script the host can read or closely follow while recording. The "
-        "script should sound like natural spoken speech, not a written article — short sentences, "
-        "verbal transitions, room for the host's own voice."
-    )
-    if style_excerpts.strip():
-        system += (
-            "\n\nExcerpts from this show's past episodes are provided below as a style reference — "
-            "match their tone, pacing, and vocabulary so the new script sounds like the same show, "
-            "not a generic one."
-        )
-    system = _with_custom_instructions(system, custom_instructions)
-    user = f"Topic / idea for this episode:\n{topic}\n\n"
-    if research.strip():
-        user += f"Research notes to draw on:\n{research}\n\n"
-    if style_excerpts.strip():
-        user += f"Style reference — excerpts from past episodes of this show:\n{style_excerpts}\n\n"
-    user += (
-        "Write this episode. First produce an outline: 5-10 short beats in the order they'll be "
-        "covered. Then write the full word-by-word script that follows that outline, ready to "
-        "read aloud."
-    )
-    schema = {
-        "type": "object",
-        "properties": {
-            "outline": {"type": "array", "items": {"type": "string"}},
-            "script": {"type": "string"},
-        },
-        "required": ["outline", "script"],
-        "additionalProperties": False,
-    }
-    return system, user, schema
-
-
 def chapters_prompt(transcript_text: str, custom_instructions: str = "") -> tuple[str, str, dict]:
     system = (
         "You divide a podcast transcript into chapters — meaningful topic segments a listener could "
