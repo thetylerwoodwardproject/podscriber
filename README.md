@@ -49,6 +49,43 @@ without losing or overwriting the one you already shipped. Once a soundbite has 
 variant, the soundbites list shows a "Video 1 / Video 2 / …" picker next to **Edit** instead of a
 single link.
 
+## Analytics
+
+The **Analytics** page pulls your show's real numbers once you've added credentials in Settings:
+
+- **Directory metadata** (via [PodcastIndex.org](https://podcastindex.org)) — your feed's artwork,
+  author, indexed episode count, categories, and Value4Value status. Requires a PodcastIndex API
+  key/secret and your feed URL under Settings → PodcastIndex.
+- **Episode details** (also via PodcastIndex) — a duration histogram and a per-episode table of
+  publish date and duration, joined with OP3 download counts by title where available.
+- **Download analytics** (via [OP3.dev](https://op3.dev), a free open-source download tracker) —
+  30-day and weekly-average downloads, a weekly trend chart, and a top-episodes table. OP3 only
+  has data for episodes whose enclosure URLs are routed through an OP3 redirect prefix, which is
+  set up on your hosting platform, not in Podscriber — the page shows the exact prefix to add and
+  explains there's no historical backfill. Requires an OP3 API key under Settings → OP3.
+
+Each section fetches independently, so you can use PodcastIndex metadata without OP3, or vice
+versa. Results are cached (24h for PodcastIndex, 6h for OP3) with a manual **Refresh** button to
+force a refetch; if a refetch fails, the page falls back to showing the last good data marked
+"Stale" rather than an error.
+
+## Improvements
+
+The **Improvements** page pulls your show's back catalog from its RSS feed (via PodcastIndex, same
+credentials as Analytics) and lines each episode's original title/description up against an
+AI-suggested, SEO-optimized replacement — a title, description, and target keywords.
+
+- **Suggest improvements** generates a suggestion from the episode's existing title and
+  description alone.
+- **Suggest using transcript** downloads and transcribes the episode's audio first, then generates
+  the suggestion from the full transcript for a more informed rewrite — slower, but worth it for
+  older or thin show notes. Once used, the button becomes **Regenerate using transcript**.
+- **Generate all missing suggestions** runs the fast (non-transcript) suggestion for every episode
+  in the feed that doesn't have one yet, with a progress bar.
+
+Every suggested title, description, and keyword list can be copied with one click to paste into
+your hosting platform or feed editor — Podscriber doesn't publish these back to the feed itself.
+
 ## Social publishing (Postiz)
 
 Podscriber can publish or schedule posts directly to your social accounts through
@@ -80,9 +117,11 @@ happen automatically so you don't have to think about platform quirks:
 
 - All data (episodes, transcripts, generated content, exported videos) lives under `media/` and
   `podscriber.db` in this project directory. Nothing leaves your machine except calls you explicitly
-  configure — to Claude/OpenAI in Settings, and to your own Postiz instance if you publish a post —
-  local Whisper and Ollama are fully offline.
+  configure — to Claude/OpenAI in Settings, to PodcastIndex.org/OP3.dev if you set up Analytics or
+  Improvements, and to your own Postiz instance if you publish a post — local Whisper and Ollama are
+  fully offline.
 - API keys (including your Postiz API key) are stored unencrypted in `podscriber.db` (this is a
   single-user local tool — don't share that file).
-- The Podcast Index and OP3 Settings fields are credential storage only, for parity with the original
-  design — they aren't wired into any feature yet (no analytics dashboard).
+- The PodcastIndex and OP3 Settings fields power the **Analytics** and **Improvements** pages (see
+  above) — both are optional and each page degrades to an empty state explaining what to add if
+  either is left unconfigured.
