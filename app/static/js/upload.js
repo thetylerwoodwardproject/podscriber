@@ -9,16 +9,22 @@
   var errorBox = document.getElementById("error-box");
   var stepsCard = document.getElementById("steps-card");
   var selectAllCheckbox = document.getElementById("steps-select-all");
-  var stepCheckboxes = Array.prototype.slice.call(document.querySelectorAll(".step-checkbox"));
+  var stepCheckboxes = Array.prototype.slice.call(
+    document.querySelectorAll(".step-checkbox"),
+  );
 
   var currentEpisodeId = null;
 
   selectAllCheckbox.addEventListener("change", function () {
-    stepCheckboxes.forEach(function (cb) { cb.checked = selectAllCheckbox.checked; });
+    stepCheckboxes.forEach(function (cb) {
+      cb.checked = selectAllCheckbox.checked;
+    });
   });
   stepCheckboxes.forEach(function (cb) {
     cb.addEventListener("change", function () {
-      selectAllCheckbox.checked = stepCheckboxes.every(function (c) { return c.checked; });
+      selectAllCheckbox.checked = stepCheckboxes.every(function (c) {
+        return c.checked;
+      });
     });
   });
 
@@ -54,7 +60,8 @@
       })
       .then(function (data) {
         currentEpisodeId = data.episode_id;
-        fileMetaEl.textContent = formatBytes(data.size_bytes) + " · ready to process";
+        fileMetaEl.textContent =
+          formatBytes(data.size_bytes) + " · ready to process";
         startBtn.disabled = false;
         stepsCard.style.display = "block";
       })
@@ -64,7 +71,9 @@
       });
   }
 
-  browseBtn.addEventListener("click", function () { fileInput.click(); });
+  browseBtn.addEventListener("click", function () {
+    fileInput.click();
+  });
   fileInput.addEventListener("change", function () {
     if (fileInput.files[0]) uploadFile(fileInput.files[0]);
   });
@@ -94,7 +103,10 @@
     stepCheckboxes.forEach(function (cb) {
       if (cb.checked) formData.append("steps", cb.value);
     });
-    fetch("/episodes/" + currentEpisodeId + "/process", { method: "POST", body: formData }).then(function (res) {
+    fetch("/episodes/" + currentEpisodeId + "/process", {
+      method: "POST",
+      body: formData,
+    }).then(function (res) {
       window.location.href = res.url;
     });
   });

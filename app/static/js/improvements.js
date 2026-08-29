@@ -51,8 +51,14 @@
         return res.text().then(function (html) {
           if (!res.ok) {
             var data = null;
-            try { data = JSON.parse(html); } catch (parseErr) { /* not JSON */ }
-            throw new Error((data && data.detail) || "Couldn't generate a suggestion.");
+            try {
+              data = JSON.parse(html);
+            } catch (parseErr) {
+              /* not JSON */
+            }
+            throw new Error(
+              (data && data.detail) || "Couldn't generate a suggestion.",
+            );
           }
           return html;
         });
@@ -84,7 +90,9 @@
     var col = row.querySelector(".improvement-col-ai");
     var suggestionCol = col.querySelector(".js-suggestion-col");
     var status = btn.parentElement.querySelector(".js-suggest-deep-status");
-    var stepText = status ? status.querySelector(".js-suggest-deep-step") : null;
+    var stepText = status
+      ? status.querySelector(".js-suggest-deep-step")
+      : null;
     var key = btn.getAttribute("data-episode-key");
     btn.disabled = true;
     if (status) status.style.display = "inline-flex";
@@ -100,29 +108,49 @@
         return res.text().then(function (text) {
           if (!res.ok) {
             var data = null;
-            try { data = JSON.parse(text); } catch (parseErr) { /* not JSON */ }
+            try {
+              data = JSON.parse(text);
+            } catch (parseErr) {
+              /* not JSON */
+            }
             throw new Error((data && data.detail) || "Couldn't start the job.");
           }
           return JSON.parse(text);
         });
       })
       .then(function (data) {
-        PS.streamStatus("/improvements/suggest-deep/status/stream?job_id=" + data.job_id, function (payload) {
-          if (stepText && payload.status === "running" && payload.current_step) {
-            stepText.textContent = deepStepLabels[payload.current_step] || payload.current_step;
-          }
-          if (payload.status === "done") {
-            fetch("/improvements/suggest-deep/result?key=" + encodeURIComponent(key))
-              .then(function (r) { return r.text(); })
-              .then(function (html) {
-                suggestionCol.innerHTML = html;
-              });
-          } else if (payload.status === "error") {
-            PS.showInlineError(col, payload.error_message || "Couldn't finish the job.");
-            btn.disabled = false;
-            if (status) status.style.display = "none";
-          }
-        });
+        PS.streamStatus(
+          "/improvements/suggest-deep/status/stream?job_id=" + data.job_id,
+          function (payload) {
+            if (
+              stepText &&
+              payload.status === "running" &&
+              payload.current_step
+            ) {
+              stepText.textContent =
+                deepStepLabels[payload.current_step] || payload.current_step;
+            }
+            if (payload.status === "done") {
+              fetch(
+                "/improvements/suggest-deep/result?key=" +
+                  encodeURIComponent(key),
+              )
+                .then(function (r) {
+                  return r.text();
+                })
+                .then(function (html) {
+                  suggestionCol.innerHTML = html;
+                });
+            } else if (payload.status === "error") {
+              PS.showInlineError(
+                col,
+                payload.error_message || "Couldn't finish the job.",
+              );
+              btn.disabled = false;
+              if (status) status.style.display = "none";
+            }
+          },
+        );
       })
       .catch(function (err) {
         PS.showInlineError(col, err.message);
@@ -136,13 +164,18 @@
     var copyBtn = e.target.closest(".js-copy-btn");
     if (!copyBtn) return;
     var col = copyBtn.closest(".improvement-col-ai");
-    var fieldSelector = copyBtn.getAttribute("data-copy-target") === "title" ? ".js-suggested-title" : ".js-suggested-description";
+    var fieldSelector =
+      copyBtn.getAttribute("data-copy-target") === "title"
+        ? ".js-suggested-title"
+        : ".js-suggested-description";
     var field = col.querySelector(fieldSelector);
     if (!field) return;
     PS.copyToClipboard(field);
     var original = copyBtn.innerHTML;
     copyBtn.textContent = "Copied!";
-    setTimeout(function () { copyBtn.innerHTML = original; }, 1200);
+    setTimeout(function () {
+      copyBtn.innerHTML = original;
+    }, 1200);
   });
 
   // --- Bulk "Generate all missing suggestions" ---
@@ -159,27 +192,36 @@
     statusText.textContent = "Starting…";
 
     fetch("/improvements/generate-all", { method: "POST" })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function () {
-        PS.streamStatus("/improvements/generate-all/status/stream", function (payload) {
-          progressFill.style.width = (payload.progress_pct || 0) + "%";
-          if (payload.status === "running" && payload.current_step) {
-            statusText.textContent = "Suggesting " + payload.current_step;
-          }
-          if (payload.status === "done") {
-            statusText.textContent = "Done.";
-            fetch("/improvements/rows-fragment")
-              .then(function (r) { return r.text(); })
-              .then(function (html) {
-                content.innerHTML = html;
-                generateAllBtn.disabled = false;
-                progressTrack.style.display = "none";
-              });
-          } else if (payload.status === "error") {
-            statusText.textContent = "Couldn't finish: " + (payload.error_message || "unknown error");
-            generateAllBtn.disabled = false;
-          }
-        });
+        PS.streamStatus(
+          "/improvements/generate-all/status/stream",
+          function (payload) {
+            progressFill.style.width = (payload.progress_pct || 0) + "%";
+            if (payload.status === "running" && payload.current_step) {
+              statusText.textContent = "Suggesting " + payload.current_step;
+            }
+            if (payload.status === "done") {
+              statusText.textContent = "Done.";
+              fetch("/improvements/rows-fragment")
+                .then(function (r) {
+                  return r.text();
+                })
+                .then(function (html) {
+                  content.innerHTML = html;
+                  generateAllBtn.disabled = false;
+                  progressTrack.style.display = "none";
+                });
+            } else if (payload.status === "error") {
+              statusText.textContent =
+                "Couldn't finish: " +
+                (payload.error_message || "unknown error");
+              generateAllBtn.disabled = false;
+            }
+          },
+        );
       });
   });
 })();
