@@ -2,7 +2,9 @@
   var checkbox = document.getElementById("openai-share-key");
   if (!checkbox) return;
 
-  var radios = document.querySelectorAll('#text-provider-radios input[name="text_provider"]');
+  var radios = document.querySelectorAll(
+    '#text-provider-radios input[name="text_provider"]',
+  );
   var radiosWrap = document.getElementById("text-provider-radios");
   var textApiKeyInput = document.getElementById("openai_api_key");
 

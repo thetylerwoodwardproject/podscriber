@@ -11,13 +11,41 @@ function svgEl(tag, attrs) {
 // A rect with rounded top corners, square at the baseline (mark spec for columns).
 function roundedTopRectPath(x, y, w, h, r) {
   r = Math.min(r, w / 2, Math.max(h, 0));
-  return "M" + x + "," + (y + h) +
-    "L" + x + "," + (y + r) +
-    "Q" + x + "," + y + " " + (x + r) + "," + y +
-    "L" + (x + w - r) + "," + y +
-    "Q" + (x + w) + "," + y + " " + (x + w) + "," + (y + r) +
-    "L" + (x + w) + "," + (y + h) +
-    "Z";
+  return (
+    "M" +
+    x +
+    "," +
+    (y + h) +
+    "L" +
+    x +
+    "," +
+    (y + r) +
+    "Q" +
+    x +
+    "," +
+    y +
+    " " +
+    (x + r) +
+    "," +
+    y +
+    "L" +
+    (x + w - r) +
+    "," +
+    y +
+    "Q" +
+    (x + w) +
+    "," +
+    y +
+    " " +
+    (x + w) +
+    "," +
+    (y + r) +
+    "L" +
+    (x + w) +
+    "," +
+    (y + h) +
+    "Z"
+  );
 }
 
 function statsTooltip() {
@@ -33,8 +61,8 @@ function showTooltip(el, text) {
   var tooltip = statsTooltip();
   var rect = el.getBoundingClientRect();
   tooltip.textContent = text;
-  tooltip.style.left = (rect.left + rect.width / 2) + "px";
-  tooltip.style.top = (rect.top - 6) + "px";
+  tooltip.style.left = rect.left + rect.width / 2 + "px";
+  tooltip.style.top = rect.top - 6 + "px";
   tooltip.classList.add("visible");
 }
 
@@ -55,46 +83,112 @@ function renderLineChart(container, points) {
   container.innerHTML = "";
   if (!points.length) return;
 
-  var W = 640, H = 180, top = 10, bottom = 138, left = 34, right = 8;
-  var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, class: "stats-chart", role: "img" });
+  var W = 640,
+    H = 180,
+    top = 10,
+    bottom = 138,
+    left = 34,
+    right = 8;
+  var svg = svgEl("svg", {
+    viewBox: "0 0 " + W + " " + H,
+    class: "stats-chart",
+    role: "img",
+  });
 
-  var counts = points.map(function (p) { return p.count; });
+  var counts = points.map(function (p) {
+    return p.count;
+  });
   var peak = Math.max.apply(null, counts) || 1;
   var n = points.length;
   var xStep = n > 1 ? (W - left - right) / (n - 1) : 0;
-  var xAt = function (i) { return left + i * xStep; };
-  var yAt = function (c) { return bottom - (c / peak) * (bottom - top); };
+  var xAt = function (i) {
+    return left + i * xStep;
+  };
+  var yAt = function (c) {
+    return bottom - (c / peak) * (bottom - top);
+  };
 
   [0, 0.5, 1].forEach(function (frac) {
     var y = bottom - frac * (bottom - top);
-    svg.appendChild(svgEl("line", { class: "grid-line", x1: left, x2: W - right, y1: y, y2: y }));
-    var label = svgEl("text", { class: "axis-label", x: left - 6, y: y + 3, "text-anchor": "end" });
+    svg.appendChild(
+      svgEl("line", {
+        class: "grid-line",
+        x1: left,
+        x2: W - right,
+        y1: y,
+        y2: y,
+      }),
+    );
+    var label = svgEl("text", {
+      class: "axis-label",
+      x: left - 6,
+      y: y + 3,
+      "text-anchor": "end",
+    });
     label.textContent = Math.round(peak * frac).toLocaleString();
     svg.appendChild(label);
   });
 
-  var linePoints = points.map(function (p, i) { return xAt(i) + "," + yAt(p.count); });
-  var areaD = "M" + linePoints.join(" L") + " L" + xAt(n - 1) + "," + bottom + " L" + xAt(0) + "," + bottom + " Z";
+  var linePoints = points.map(function (p, i) {
+    return xAt(i) + "," + yAt(p.count);
+  });
+  var areaD =
+    "M" +
+    linePoints.join(" L") +
+    " L" +
+    xAt(n - 1) +
+    "," +
+    bottom +
+    " L" +
+    xAt(0) +
+    "," +
+    bottom +
+    " Z";
   svg.appendChild(svgEl("path", { class: "area-mark", d: areaD }));
-  svg.appendChild(svgEl("path", { class: "line-mark", d: "M" + linePoints.join(" L") }));
+  svg.appendChild(
+    svgEl("path", { class: "line-mark", d: "M" + linePoints.join(" L") }),
+  );
 
   var labelEvery = n > 8 ? 2 : 1;
   points.forEach(function (p, i) {
     if (i % labelEvery === 0 || i === n - 1) {
-      var xl = svgEl("text", { class: "axis-label", x: xAt(i), y: bottom + 16, "text-anchor": "middle" });
+      var xl = svgEl("text", {
+        class: "axis-label",
+        x: xAt(i),
+        y: bottom + 16,
+        "text-anchor": "middle",
+      });
       xl.textContent = p.label;
       svg.appendChild(xl);
     }
-    var hit = svgEl("circle", { cx: xAt(i), cy: yAt(p.count), r: 10, fill: "transparent" });
-    hit.addEventListener("mouseenter", function () { showTooltip(hit, p.label + ": " + p.count.toLocaleString() + " downloads"); });
+    var hit = svgEl("circle", {
+      cx: xAt(i),
+      cy: yAt(p.count),
+      r: 10,
+      fill: "transparent",
+    });
+    hit.addEventListener("mouseenter", function () {
+      showTooltip(
+        hit,
+        p.label + ": " + p.count.toLocaleString() + " downloads",
+      );
+    });
     hit.addEventListener("mouseleave", hideTooltip);
     svg.appendChild(hit);
   });
 
   // End dot + direct label at the endpoint only — the one point the story is about.
-  var lastX = xAt(n - 1), lastY = yAt(points[n - 1].count);
-  svg.appendChild(svgEl("circle", { class: "dot-mark", cx: lastX, cy: lastY, r: 5 }));
-  var endLabel = svgEl("text", { class: "value-label", x: lastX, y: lastY - 12, "text-anchor": "end" });
+  var lastX = xAt(n - 1),
+    lastY = yAt(points[n - 1].count);
+  svg.appendChild(
+    svgEl("circle", { class: "dot-mark", cx: lastX, cy: lastY, r: 5 }),
+  );
+  var endLabel = svgEl("text", {
+    class: "value-label",
+    x: lastX,
+    y: lastY - 12,
+    "text-anchor": "end",
+  });
   endLabel.textContent = points[n - 1].count.toLocaleString();
   svg.appendChild(endLabel);
 
@@ -106,32 +200,68 @@ function renderColumnChart(container, bars) {
   container.innerHTML = "";
   if (!bars.length) return;
 
-  var W = 480, H = 170, top = 14, bottom = 130, marginX = 8;
-  var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, class: "stats-chart", role: "img" });
+  var W = 480,
+    H = 170,
+    top = 14,
+    bottom = 130,
+    marginX = 8;
+  var svg = svgEl("svg", {
+    viewBox: "0 0 " + W + " " + H,
+    class: "stats-chart",
+    role: "img",
+  });
 
-  var counts = bars.map(function (b) { return b.count; });
+  var counts = bars.map(function (b) {
+    return b.count;
+  });
   var peak = Math.max.apply(null, counts) || 1;
   var slot = (W - marginX * 2) / bars.length;
   var barWidth = Math.min(24, slot - 6);
 
-  svg.appendChild(svgEl("line", { class: "grid-line", x1: marginX, x2: W - marginX, y1: bottom, y2: bottom }));
+  svg.appendChild(
+    svgEl("line", {
+      class: "grid-line",
+      x1: marginX,
+      x2: W - marginX,
+      y1: bottom,
+      y2: bottom,
+    }),
+  );
 
   bars.forEach(function (b, i) {
     var x = marginX + i * slot + (slot - barWidth) / 2;
     var h = Math.max((b.count / peak) * (bottom - top), b.count > 0 ? 2 : 0);
     var y = bottom - h;
-    var path = svgEl("path", { class: "bar-mark", d: roundedTopRectPath(x, y, barWidth, h, 4) });
-    path.addEventListener("mouseenter", function () { showTooltip(path, b.label + ": " + b.count.toLocaleString() + " episodes"); });
+    var path = svgEl("path", {
+      class: "bar-mark",
+      d: roundedTopRectPath(x, y, barWidth, h, 4),
+    });
+    path.addEventListener("mouseenter", function () {
+      showTooltip(
+        path,
+        b.label + ": " + b.count.toLocaleString() + " episodes",
+      );
+    });
     path.addEventListener("mouseleave", hideTooltip);
     svg.appendChild(path);
 
     if (b.count === peak && peak > 0) {
-      var vl = svgEl("text", { class: "value-label", x: x + barWidth / 2, y: y - 6, "text-anchor": "middle" });
+      var vl = svgEl("text", {
+        class: "value-label",
+        x: x + barWidth / 2,
+        y: y - 6,
+        "text-anchor": "middle",
+      });
       vl.textContent = b.count.toLocaleString();
       svg.appendChild(vl);
     }
 
-    var xl = svgEl("text", { class: "axis-label", x: x + barWidth / 2, y: bottom + 16, "text-anchor": "middle" });
+    var xl = svgEl("text", {
+      class: "axis-label",
+      x: x + barWidth / 2,
+      y: bottom + 16,
+      "text-anchor": "middle",
+    });
     xl.textContent = b.label;
     svg.appendChild(xl);
   });
@@ -146,7 +276,13 @@ function renderHBarChart(container, episodes) {
   var top = episodes.slice(0, 6);
   if (!top.length) return;
 
-  var peak = Math.max.apply(null, top.map(function (e) { return e.downloads_all; })) || 1;
+  var peak =
+    Math.max.apply(
+      null,
+      top.map(function (e) {
+        return e.downloads_all;
+      }),
+    ) || 1;
   var list = document.createElement("div");
   list.style.cssText = "display:flex;flex-direction:column;gap:10px";
 
@@ -157,20 +293,31 @@ function renderHBarChart(container, episodes) {
     var label = document.createElement("div");
     label.textContent = ep.title;
     label.title = ep.title;
-    label.style.cssText = "flex:0 0 160px;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+    label.style.cssText =
+      "flex:0 0 160px;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
 
     var track = document.createElement("div");
-    track.style.cssText = "flex:1;background:var(--faint);border-radius:4px;height:16px;overflow:hidden";
+    track.style.cssText =
+      "flex:1;background:var(--faint);border-radius:4px;height:16px;overflow:hidden";
     var fill = document.createElement("div");
     var pct = Math.max((ep.downloads_all / peak) * 100, 2);
-    fill.style.cssText = "height:100%;width:" + pct + "%;background:var(--accent);border-radius:0 4px 4px 0";
+    fill.style.cssText =
+      "height:100%;width:" +
+      pct +
+      "%;background:var(--accent);border-radius:0 4px 4px 0";
     track.appendChild(fill);
-    track.addEventListener("mouseenter", function () { showTooltip(track, ep.title + ": " + ep.downloads_all.toLocaleString() + " downloads"); });
+    track.addEventListener("mouseenter", function () {
+      showTooltip(
+        track,
+        ep.title + ": " + ep.downloads_all.toLocaleString() + " downloads",
+      );
+    });
     track.addEventListener("mouseleave", hideTooltip);
 
     var value = document.createElement("div");
     value.textContent = ep.downloads_all.toLocaleString();
-    value.style.cssText = "flex:0 0 auto;font-size:12px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;min-width:44px;text-align:right";
+    value.style.cssText =
+      "flex:0 0 auto;font-size:12px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;min-width:44px;text-align:right";
 
     row.appendChild(label);
     row.appendChild(track);
@@ -187,10 +334,12 @@ PS.initAnalyticsCharts = function () {
   if (weekly) renderLineChart(weekly, readJsonAttr(weekly, "data-weekly-bars"));
 
   var duration = document.getElementById("stats-duration-chart");
-  if (duration) renderColumnChart(duration, readJsonAttr(duration, "data-bars"));
+  if (duration)
+    renderColumnChart(duration, readJsonAttr(duration, "data-bars"));
 
   var topEpisodes = document.getElementById("stats-top-episodes-chart");
-  if (topEpisodes) renderHBarChart(topEpisodes, readJsonAttr(topEpisodes, "data-episodes"));
+  if (topEpisodes)
+    renderHBarChart(topEpisodes, readJsonAttr(topEpisodes, "data-episodes"));
 };
 
 PS.initAnalyticsCharts();

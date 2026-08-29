@@ -21,7 +21,9 @@
   toggle.addEventListener("click", function () {
     setOpen(!document.body.classList.contains("sidebar-open"));
   });
-  overlay.addEventListener("click", function () { setOpen(false); });
+  overlay.addEventListener("click", function () {
+    setOpen(false);
+  });
 })();
 
 // Shared AJAX-form helpers, available on every page (this file is loaded from base.html).
@@ -49,7 +51,11 @@ window.PS = window.PS || {};
   };
 
   PS.copyToClipboard = function (field) {
-    if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+    if (
+      window.isSecureContext &&
+      navigator.clipboard &&
+      navigator.clipboard.writeText
+    ) {
       return navigator.clipboard.writeText(field.value);
     }
     // navigator.clipboard requires a secure context (https:// or localhost) — it's undefined
@@ -101,12 +107,18 @@ window.PS = window.PS || {};
 
   document.addEventListener("submit", function (e) {
     var form = e.target;
-    if (!(form instanceof HTMLFormElement) || !form.hasAttribute("data-ajax")) return;
+    if (!(form instanceof HTMLFormElement) || !form.hasAttribute("data-ajax"))
+      return;
     e.preventDefault();
 
     var submitter = e.submitter;
-    var url = (submitter && submitter.getAttribute("formaction")) || form.action;
-    var method = ((submitter && submitter.getAttribute("formmethod")) || form.method || "POST").toUpperCase();
+    var url =
+      (submitter && submitter.getAttribute("formaction")) || form.action;
+    var method = (
+      (submitter && submitter.getAttribute("formmethod")) ||
+      form.method ||
+      "POST"
+    ).toUpperCase();
     var body = new FormData(form, submitter || undefined);
 
     if (submitter) submitter.disabled = true;
@@ -114,20 +126,29 @@ window.PS = window.PS || {};
 
     fetch(url, { method: method, body: body })
       .then(function (res) {
-        return res.json().catch(function () { return null; }).then(function (data) {
-          if (!res.ok) {
-            var message = (data && data.detail) || ("Request failed (" + res.status + ")");
-            throw new Error(message);
-          }
-          return data;
-        });
+        return res
+          .json()
+          .catch(function () {
+            return null;
+          })
+          .then(function (data) {
+            if (!res.ok) {
+              var message =
+                (data && data.detail) || "Request failed (" + res.status + ")";
+              throw new Error(message);
+            }
+            return data;
+          });
       })
       .then(function (data) {
         if (submitter) submitter.disabled = false;
         var mode = form.getAttribute("data-ajax-on-success") || "flash";
         if (mode === "flash") {
           var flashSel = form.getAttribute("data-ajax-flash-target");
-          var target = (flashSel && form.querySelector(flashSel)) || form.querySelector("button[type=submit]") || form;
+          var target =
+            (flashSel && form.querySelector(flashSel)) ||
+            form.querySelector("button[type=submit]") ||
+            form;
           PS.flashSaved(target);
         } else if (mode === "remove") {
           var removeSel = form.getAttribute("data-ajax-remove");
@@ -135,17 +156,30 @@ window.PS = window.PS || {};
           if (el) el.remove();
         } else if (mode === "set-class") {
           var setSel = form.getAttribute("data-ajax-set-target");
-          var setEl = setSel ? (form.querySelector(setSel) || form.closest(setSel)) : null;
+          var setEl = setSel
+            ? form.querySelector(setSel) || form.closest(setSel)
+            : null;
           var field = form.getAttribute("data-ajax-set-field");
           var cls = form.getAttribute("data-ajax-set-class");
-          if (setEl && field && cls) setEl.classList.toggle(cls, !!(data && data[field]));
+          if (setEl && field && cls)
+            setEl.classList.toggle(cls, !!(data && data[field]));
         }
-        form.dispatchEvent(new CustomEvent("ps:ajax-success", { bubbles: true, detail: { data: data } }));
+        form.dispatchEvent(
+          new CustomEvent("ps:ajax-success", {
+            bubbles: true,
+            detail: { data: data },
+          }),
+        );
       })
       .catch(function (err) {
         if (submitter) submitter.disabled = false;
         PS.showInlineError(form, err.message);
-        form.dispatchEvent(new CustomEvent("ps:ajax-error", { bubbles: true, detail: { error: err } }));
+        form.dispatchEvent(
+          new CustomEvent("ps:ajax-error", {
+            bubbles: true,
+            detail: { error: err },
+          }),
+        );
       });
   });
 })();
