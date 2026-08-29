@@ -44,6 +44,56 @@ def test_publish_one_platform_parses_list_response(db):
     assert row.postiz_post_id == "abc123"
 
 
+def test_publish_one_platform_persists_group_and_post_index(db):
+    """group_index/post_index disambiguate which of an episode's several posts-per-platform a
+    row belongs to — without them, two different X posts for the same episode would be
+    indistinguishable in SocialPublish, and the Social Posts tab couldn't show per-post status."""
+    job = Job(job_type="episode_processing")
+    db.add(job)
+    db.commit()
+
+    integrations = {"x": Integration(id="int-1", platform="x", name="My X")}
+    with patch(
+        "app.services.social_publish.create_post",
+        return_value=[{"postId": "abc123", "integration": "int-1"}],
+    ):
+        publish_one_platform(
+            db,
+            job=job,
+            base_url="https://postiz.example.com/api",
+            api_key="key",
+            integrations=integrations,
+            platform="x",
+            content="hello world",
+            media=None,
+            post_type="now",
+            date="2026-08-20T00:00:00.000Z",
+            episode_id=1,
+            group_index=2,
+            post_index=1,
+        )
+
+    row = db.query(SocialPublish).one()
+    assert row.group_index == 2
+    assert row.post_index == 1
+
+
+def test_record_publish_error_persists_group_and_post_index(db):
+    job = Job(job_type="episode_processing")
+    db.add(job)
+    db.commit()
+
+    social_publish.record_publish_error(
+        db, job=job, platform="x", message="boom", episode_id=1, group_index=0, post_index=3
+    )
+    db.commit()
+
+    row = db.query(SocialPublish).one()
+    assert row.group_index == 0
+    assert row.post_index == 3
+    assert row.status == "error"
+
+
 def test_publish_one_platform_media_list_passed_through_to_create_post(db):
     job = Job(job_type="episode_processing")
     db.add(job)
@@ -194,6 +244,29 @@ def test_publish_one_platform_truncates_outgoing_content_without_mutating_caller
 )
 def test_default_settings_for_platform(platform, kwargs, expected):
     assert default_settings_for_platform(platform, **kwargs) == expected
+
+
+def test_default_settings_for_youtube_includes_native_thumbnail_when_given():
+    media = {"id": "m1", "path": "https://postiz.example.com/media/thumb.png"}
+    assert default_settings_for_platform("youtube", youtube_title="My Video", youtube_thumbnail=media) == {
+        "title": "My Video",
+        "type": "public",
+        "thumbnail": media,
+    }
+
+
+def test_default_settings_for_youtube_omits_thumbnail_key_when_none():
+    # Regression guard: passing youtube_thumbnail=None must not add a "thumbnail": None key —
+    # the shape must stay identical to the no-thumbnail case.
+    assert default_settings_for_platform("youtube", youtube_title="My Video", youtube_thumbnail=None) == {
+        "title": "My Video",
+        "type": "public",
+    }
+
+
+def test_default_settings_for_tiktok_ignores_youtube_thumbnail_kwarg():
+    media = {"id": "m1", "path": "x"}
+    assert default_settings_for_platform("tiktok", youtube_thumbnail=media) == TIKTOK_DEFAULT_SETTINGS
 
 
 @pytest.mark.parametrize("platform", ["threads", "facebook", "tiktok", "youtube", "instagram"])

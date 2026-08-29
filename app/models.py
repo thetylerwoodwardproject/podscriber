@@ -171,6 +171,11 @@ class SocialPublish(TimestampMixin, Base):
     video_clip_id: Mapped[int | None] = mapped_column(ForeignKey("video_clips.id"), nullable=True)
     episode_id: Mapped[int | None] = mapped_column(ForeignKey("episodes.id"), nullable=True)
     job_id: Mapped[int | None] = mapped_column(ForeignKey("jobs.id"), nullable=True)
+    # Set only for episode-level publishes, where GeneratedContent.social_posts can hold several
+    # posts per platform — disambiguates which specific post this row belongs to. Always None for
+    # clip-level rows, where video_clip_id already uniquely identifies the one post per clip.
+    group_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    post_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     platform: Mapped[str] = mapped_column(String)  # tiktok|youtube|x|instagram|bluesky|threads|facebook
     postiz_post_id: Mapped[str | None] = mapped_column(String, nullable=True)
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

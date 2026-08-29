@@ -7,11 +7,11 @@ from sqlalchemy.orm import Session
 
 from app.config import config
 from app.db import get_db
-from app.models import Chapter, Episode, SocialAttachment, Soundbite
+from app.models import Chapter, Episode, SocialAttachment, SocialPublish, Soundbite
 from app.routers._shared import latest_job, recent_episodes, sse_job_stream, submit_and_track_job
 from app.services import settings_store, storage
 from app.services.chapters_export import build_chapters_json
-from app.services.jobs import submit_episode_social_publish, submit_social_regenerate
+from app.services.jobs import submit_episode_social_publish, submit_social_regenerate, submit_soundbite_regenerate
 from app.services.llm.factory import get_llm_provider
 from app.services.llm.prompts import SOCIAL_TONES
 from app.services.postiz import PLATFORMS
@@ -48,6 +48,27 @@ def _get_or_404(db: Session, episode_id: int) -> Episode:
     if episode is None:
         raise HTTPException(status_code=404, detail=f"No episode {episode_id}")
     return episode
+
+
+def _latest_social_publishes(db: Session, episode_id: int) -> dict[str, SocialPublish]:
+    """Reduces this episode's SocialPublish rows to the most recent one per
+    (group_index, post_index, platform), so the Social Posts tab can show a persistent
+    published/scheduled/failed status instead of only the transient live-publish SSE state.
+    Keyed as "{group_index}:{post_index}:{platform}" to match the template's lookup."""
+    rows = (
+        db.query(SocialPublish)
+        .filter(
+            SocialPublish.episode_id == episode_id,
+            SocialPublish.group_index.isnot(None),
+            SocialPublish.post_index.isnot(None),
+        )
+        .order_by(SocialPublish.created_at)
+        .all()
+    )
+    latest: dict[str, SocialPublish] = {}
+    for row in rows:
+        latest[f"{row.group_index}:{row.post_index}:{row.platform}"] = row
+    return latest
 
 
 @router.get("/episodes/{episode_id}", response_class=HTMLResponse)
@@ -88,6 +109,7 @@ def results_page(episode_id: int, request: Request, tab: str = "titles", db: Ses
         "social_tones": SOCIAL_TONES,
         "postiz_configured": bool(settings_store.get(db, "postiz_base_url") and settings_store.get(db, "postiz_api_key")),
         "video_options": episode_video_options(episode),
+        "latest_publish_by_post": _latest_social_publishes(db, episode_id),
     }
     return templates.TemplateResponse(request, "results.html", context)
 
@@ -199,6 +221,7 @@ def social_posts_fragment(episode_id: int, request: Request, db: Session = Depen
         "content": episode.generated_content,
         "postiz_configured": bool(settings_store.get(db, "postiz_base_url") and settings_store.get(db, "postiz_api_key")),
         "video_options": episode_video_options(episode),
+        "latest_publish_by_post": _latest_social_publishes(db, episode_id),
     }
     return templates.TemplateResponse(request, "results/_social_posts_grid.html", context)
 
@@ -407,6 +430,23 @@ def download_vtt(episode_id: int, db: Session = Depends(get_db)):
 
 
 # ---- Soundbites ----
+@router.post("/episodes/{episode_id}/soundbites/regenerate")
+def regenerate_soundbites(episode_id: int, db: Session = Depends(get_db)):
+    _get_or_404(db, episode_id)
+    return submit_and_track_job(
+        db, job_type="soundbite_regenerate", submit_fn=submit_soundbite_regenerate, episode_id=episode_id
+    )
+
+
+@router.get("/episodes/{episode_id}/soundbites/regenerate/status/stream")
+def soundbite_regenerate_status_stream(episode_id: int):
+    return sse_job_stream(
+        query_fn=lambda db: latest_job(db, "soundbite_regenerate", episode_id=episode_id),
+        payload_fn=lambda job: {"status": job.status, "error_message": job.error_message},
+        not_found_payload={"status": "pending"},
+    )
+
+
 @router.post("/episodes/{episode_id}/soundbites/{soundbite_id}/toggle-include")
 def toggle_soundbite_include(episode_id: int, soundbite_id: int, db: Session = Depends(get_db)):
     sb = db.get(Soundbite, soundbite_id)

@@ -64,6 +64,8 @@ def init_db() -> None:
     _drop_column_if_exists("video_clips", "caption")
     _add_column_if_missing("jobs", "video_clip_id", "INTEGER REFERENCES video_clips(id)")
     _copy_rows_and_drop("video_clips_pre_multi", "video_clips")
+    _add_column_if_missing("social_publishes", "group_index", "INTEGER")
+    _add_column_if_missing("social_publishes", "post_index", "INTEGER")
 
 
 def _reset_table_if_missing_column(table: str, required_column: str) -> None:

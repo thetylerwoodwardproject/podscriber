@@ -2,13 +2,14 @@ import asyncio
 import json
 import re
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
-from app.models import Episode, Job
+from app.models import Episode, Job, SocialPublish
 
 _UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 
@@ -46,6 +47,27 @@ def format_duration(seconds: float | None) -> str:
         return "—"
     minutes = round(seconds / 60)
     return f"{minutes} min"
+
+
+def social_publish_status_label(pub: SocialPublish | None) -> str:
+    """Persistent, dated status text for a `SocialPublish` row — shown on page load/refresh so a
+    prior publish/schedule doesn't look untouched once the transient live-publish SSE state is
+    gone. `status="done"` covers both `post_type="now"` and `post_type="schedule"` outcomes
+    (see `publish_one_platform`), so a future `scheduled_at` is what distinguishes "still
+    scheduled" from "already posted" here."""
+    if pub is None:
+        return ""
+    if pub.status == "error":
+        return f"Failed: {pub.error_message}" if pub.error_message else "Failed"
+    if pub.status == "done":
+        scheduled_at = pub.scheduled_at
+        if scheduled_at is None:
+            return "Posted"
+        if scheduled_at.tzinfo is None:
+            scheduled_at = scheduled_at.replace(tzinfo=UTC)
+        date_str = scheduled_at.strftime("%b %-d, %Y %-I:%M %p")
+        return f"Scheduled for {date_str}" if scheduled_at > datetime.now(UTC) else f"Posted {date_str}"
+    return ""
 
 
 def ms_to_clock(ms: int) -> str:

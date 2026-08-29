@@ -41,9 +41,10 @@
           <div class="attachment-preview social-image-preview"></div>
         </div>
         <div class="social-attachment-note" style="font-size:11.5px;color:var(--warn,#c2410c);display:none"></div>
+        {% set pub = latest_publish_by_post.get(group_index ~ ":" ~ loop.index0 ~ ":" ~ grp.platform_key) %}
         <div style="display:flex;align-items:center;gap:10px">
           <button type="button" class="btn btn-outline social-publish-btn" data-group-index="{{ group_index }}" data-post-index="{{ loop.index0 }}" data-platform="{{ grp.platform_key }}" style="padding:5px 10px;font-size:12px">Publish to {{ grp.platform }}</button>
-          <span class="social-publish-status" style="font-size:11.5px;color:var(--muted-light)"></span>
+          <span class="social-publish-status" style="font-size:11.5px;color:var(--muted-light)">{{ pub | social_publish_status_label }}</span>
         </div>
       </div>
       {% endif %}

@@ -79,8 +79,10 @@ def run_episode_social_publish(job_id: int, selections: list[dict], mode: str, s
         any_ok = False
         for sel in selections:
             platform = sel["platform"]
+            group_index = sel["group_index"]
+            post_index = sel["post_index"]
             try:
-                text = content.social_posts[sel["group_index"]]["posts"][sel["post_index"]]
+                text = content.social_posts[group_index]["posts"][post_index]
             except (IndexError, KeyError, TypeError):
                 record_publish_error(
                     db,
@@ -88,20 +90,31 @@ def run_episode_social_publish(job_id: int, selections: list[dict], mode: str, s
                     platform=platform,
                     message="This post no longer exists — it may have been regenerated or edited.",
                     episode_id=episode.id,
+                    group_index=group_index,
+                    post_index=post_index,
                 )
                 continue
 
             video_path, video_err = resolve_video_source(db, episode, sel.get("video_source"))
             if sel.get("video_source") and video_err:
-                record_publish_error(db, job=job, platform=platform, message=video_err, episode_id=episode.id)
+                record_publish_error(
+                    db, job=job, platform=platform, message=video_err, episode_id=episode.id,
+                    group_index=group_index, post_index=post_index,
+                )
                 continue
             image_attachment, image_err = resolve_image_attachment(db, episode, sel.get("image_source"))
             if sel.get("image_source") and image_err:
-                record_publish_error(db, job=job, platform=platform, message=image_err, episode_id=episode.id)
+                record_publish_error(
+                    db, job=job, platform=platform, message=image_err, episode_id=episode.id,
+                    group_index=group_index, post_index=post_index,
+                )
                 continue
             instagram_err = validate_instagram_requirement([platform], image_attachment, has_video=bool(video_path))
             if instagram_err:
-                record_publish_error(db, job=job, platform=platform, message=instagram_err, episode_id=episode.id)
+                record_publish_error(
+                    db, job=job, platform=platform, message=instagram_err, episode_id=episode.id,
+                    group_index=group_index, post_index=post_index,
+                )
                 continue
 
             media_items = []
@@ -119,7 +132,7 @@ def run_episode_social_publish(job_id: int, selections: list[dict], mode: str, s
             except PostizError as exc:
                 record_publish_error(
                     db, job=job, platform=platform, message=f"Couldn't upload media to Postiz: {exc}",
-                    episode_id=episode.id,
+                    episode_id=episode.id, group_index=group_index, post_index=post_index,
                 )
                 continue
 
@@ -137,6 +150,8 @@ def run_episode_social_publish(job_id: int, selections: list[dict], mode: str, s
                 date=date,
                 settings=settings,
                 episode_id=episode.id,
+                group_index=group_index,
+                post_index=post_index,
             )
             any_ok = any_ok or ok
         db.commit()

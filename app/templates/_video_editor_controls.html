@@ -69,7 +69,7 @@
     <label style="display:flex;align-items:center;gap:6px;font-size:13px">
       <input type="checkbox" class="publish-platform-checkbox" value="{{ platform }}">
       {{ platform | capitalize }}
-      <span class="publish-platform-status" data-platform="{{ platform }}" style="font-size:11.5px;color:var(--muted-light)">{% if platform in latest_publish_by_platform %}{% set pub = latest_publish_by_platform[platform] %}{% if pub.status == 'done' %}· published{% elif pub.status == 'error' %}· failed{% endif %}{% endif %}</span>
+      <span class="publish-platform-status" data-platform="{{ platform }}" style="font-size:11.5px;color:var(--muted-light)">{% set label = latest_publish_by_platform.get(platform) | social_publish_status_label %}{% if label %}· {{ label }}{% endif %}</span>
     </label>
     {% endfor %}
   </div>
@@ -91,6 +91,14 @@
     <div id="social-image-preview" class="attachment-preview"></div>
   </div>
   <div id="social-attachment-note" style="font-size:11.5px;color:var(--warn,#c2410c);margin-bottom:8px;display:none"></div>
+  <div class="attachment-row" style="margin-bottom:4px">
+    <select id="social-thumbnail-source" class="social-thumbnail-source compact-field attachment-select">
+      <option value="">No thumbnail</option>
+      <option value="__upload_image__">Upload a thumbnail…</option>
+    </select>
+    <div id="social-thumbnail-preview" class="attachment-preview"></div>
+  </div>
+  <p style="margin:0 0 10px;color:var(--muted-light);font-size:11.5px;line-height:1.5">Sets the cover directly on YouTube; on every other platform it's inserted as the video's first frame.</p>
   <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap">
     <label style="display:flex;align-items:center;gap:6px;font-size:13px">
       <input type="radio" name="publish-mode" value="now" checked> Post now

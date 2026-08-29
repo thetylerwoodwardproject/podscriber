@@ -31,15 +31,25 @@ PLATFORM_CONTENT_LIMITS = {"x": 280, "bluesky": 300}
 
 
 def default_settings_for_platform(
-    platform: str, *, youtube_title: str = "", instagram_post_type: str = "post"
+    platform: str,
+    *,
+    youtube_title: str = "",
+    instagram_post_type: str = "post",
+    youtube_thumbnail: dict | None = None,
 ) -> dict:
     """Extra Postiz `settings` fields beyond the `__type` discriminator `create_post`
     always sets. TikTok, YouTube, and X reject posts outright without these; platforms with
-    no known extra requirements (bluesky, threads, facebook) get `{}`."""
+    no known extra requirements (bluesky, threads, facebook) get `{}`. `youtube_thumbnail` is
+    Postiz's native cover-image field for YouTube (a Media `{id, path}` dict, from
+    `upload_media`) — it's the only platform with a real thumbnail field; every other platform
+    gets its cover via the first-frame-prepend trick instead (see `video_thumbnail.py`)."""
     if platform == "tiktok":
         return dict(TIKTOK_DEFAULT_SETTINGS)
     if platform == "youtube":
-        return {"title": youtube_title or "Untitled", "type": "public"}
+        settings = {"title": youtube_title or "Untitled", "type": "public"}
+        if youtube_thumbnail:
+            settings["thumbnail"] = youtube_thumbnail
+        return settings
     if platform == "instagram":
         # Postiz's Instagram DTO only accepts "post" or "story" — "reel" (what we originally
         # guessed a 9:16 clip should map to) is rejected outright, so vertical clips are just
@@ -85,13 +95,23 @@ def resolve_integrations(base_url: str, api_key: str) -> dict[str, Integration]:
 
 
 def record_publish_error(
-    db, *, job: Job, platform: str, message: str, video_clip_id: int | None = None, episode_id: int | None = None
+    db,
+    *,
+    job: Job,
+    platform: str,
+    message: str,
+    video_clip_id: int | None = None,
+    episode_id: int | None = None,
+    group_index: int | None = None,
+    post_index: int | None = None,
 ) -> None:
     db.add(
         SocialPublish(
             job_id=job.id,
             video_clip_id=video_clip_id,
             episode_id=episode_id,
+            group_index=group_index,
+            post_index=post_index,
             platform=platform,
             status="error",
             error_message=message,
@@ -114,6 +134,8 @@ def publish_one_platform(
     settings: dict | None = None,
     video_clip_id: int | None = None,
     episode_id: int | None = None,
+    group_index: int | None = None,
+    post_index: int | None = None,
 ) -> bool:
     """Resolves `platform`'s Postiz integration, creates the post, and records a
     `SocialPublish` row (success or failure). Returns True on success. `settings` is a
@@ -128,6 +150,8 @@ def publish_one_platform(
             message="No connected Postiz integration for this platform.",
             video_clip_id=video_clip_id,
             episode_id=episode_id,
+            group_index=group_index,
+            post_index=post_index,
         )
         return False
     try:
@@ -147,7 +171,14 @@ def publish_one_platform(
         )
     except PostizError as exc:
         record_publish_error(
-            db, job=job, platform=platform, message=str(exc), video_clip_id=video_clip_id, episode_id=episode_id
+            db,
+            job=job,
+            platform=platform,
+            message=str(exc),
+            video_clip_id=video_clip_id,
+            episode_id=episode_id,
+            group_index=group_index,
+            post_index=post_index,
         )
         return False
 
@@ -161,6 +192,8 @@ def publish_one_platform(
             job_id=job.id,
             video_clip_id=video_clip_id,
             episode_id=episode_id,
+            group_index=group_index,
+            post_index=post_index,
             platform=platform,
             postiz_post_id=post_id or None,
             scheduled_at=datetime.fromisoformat(date.replace("Z", "+00:00")),
