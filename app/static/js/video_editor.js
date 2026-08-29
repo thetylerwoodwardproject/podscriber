@@ -14,9 +14,16 @@
     cfg.envelope.forEach(function (v, i) {
       var bar = document.createElement("span");
       var height = 8 + v * 34;
-      bar.style.cssText = "width:3px;border-radius:2px;background:" + color + ";height:" + height.toFixed(1) +
-        "px;animation:pulse " + (1 + (i % 5) * 0.15).toFixed(2) + "s ease-in-out infinite;animation-delay:" +
-        (i * 0.04).toFixed(2) + "s";
+      bar.style.cssText =
+        "width:3px;border-radius:2px;background:" +
+        color +
+        ";height:" +
+        height.toFixed(1) +
+        "px;animation:pulse " +
+        (1 + (i % 5) * 0.15).toFixed(2) +
+        "s ease-in-out infinite;animation-delay:" +
+        (i * 0.04).toFixed(2) +
+        "s";
       wavesEl.appendChild(bar);
     });
   }
@@ -35,48 +42,67 @@
     var formData = new FormData();
     formData.append("file", file);
     fetch(base + endpoint, { method: "POST", body: formData })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then(onDone);
   }
 
-  document.getElementById("upload-bg-btn").addEventListener("click", function () { bgFileInput.click(); });
-  if (uploadHint) uploadHint.addEventListener("click", function () { bgFileInput.click(); });
+  document
+    .getElementById("upload-bg-btn")
+    .addEventListener("click", function () {
+      bgFileInput.click();
+    });
+  if (uploadHint)
+    uploadHint.addEventListener("click", function () {
+      bgFileInput.click();
+    });
   bgFileInput.addEventListener("change", function () {
     var file = bgFileInput.files[0];
     if (!file) return;
     uploadImage(file, "/image", function (data) {
-      bgLayer.style.backgroundImage = "url('" + data.url + "?v=" + Date.now() + "')";
+      bgLayer.style.backgroundImage =
+        "url('" + data.url + "?v=" + Date.now() + "')";
       if (uploadHint) uploadHint.style.display = "none";
       document.getElementById("remove-bg-btn").style.display = "inline-flex";
     });
   });
-  document.getElementById("remove-bg-btn").addEventListener("click", function () {
-    fetch(base + "/remove-image", { method: "POST" }).then(function () {
-      bgLayer.style.backgroundImage = "none";
-      if (uploadHint) uploadHint.style.display = "flex";
-      document.getElementById("remove-bg-btn").style.display = "none";
+  document
+    .getElementById("remove-bg-btn")
+    .addEventListener("click", function () {
+      fetch(base + "/remove-image", { method: "POST" }).then(function () {
+        bgLayer.style.backgroundImage = "none";
+        if (uploadHint) uploadHint.style.display = "flex";
+        document.getElementById("remove-bg-btn").style.display = "none";
+      });
     });
-  });
 
   // --- Logo upload ---
   var logoLayer = document.getElementById("logo-layer");
   var logoImg = document.getElementById("logo-img");
-  document.getElementById("upload-logo-btn").addEventListener("click", function () { logoFileInput.click(); });
+  document
+    .getElementById("upload-logo-btn")
+    .addEventListener("click", function () {
+      logoFileInput.click();
+    });
   logoFileInput.addEventListener("change", function () {
     var file = logoFileInput.files[0];
     if (!file) return;
     uploadImage(file, "/logo", function (data) {
-      logoImg.style.backgroundImage = "url('" + data.url + "?v=" + Date.now() + "')";
+      logoImg.style.backgroundImage =
+        "url('" + data.url + "?v=" + Date.now() + "')";
       logoLayer.style.display = "flex";
       document.getElementById("remove-logo-btn").style.display = "inline-flex";
     });
   });
-  document.getElementById("remove-logo-btn").addEventListener("click", function () {
-    fetch(base + "/remove-logo", { method: "POST" }).then(function () {
-      logoLayer.style.display = "none";
-      document.getElementById("remove-logo-btn").style.display = "none";
+  document
+    .getElementById("remove-logo-btn")
+    .addEventListener("click", function () {
+      fetch(base + "/remove-logo", { method: "POST" }).then(function () {
+        logoLayer.style.display = "none";
+        document.getElementById("remove-logo-btn").style.display = "none";
+      });
     });
-  });
 
   // --- Brightness ---
   var brightnessInput = document.getElementById("brightness-input");
@@ -96,12 +122,17 @@
     renderWaveform(color);
     document.getElementById("hex-input").value = color;
     document.querySelectorAll(".waveform-swatch").forEach(function (btn) {
-      btn.style.borderColor = btn.getAttribute("data-color").toLowerCase() === color.toLowerCase() ? "var(--accent)" : "var(--border)";
+      btn.style.borderColor =
+        btn.getAttribute("data-color").toLowerCase() === color.toLowerCase()
+          ? "var(--accent)"
+          : "var(--border)";
     });
     saveSettings({ waveform_color: color });
   }
   document.querySelectorAll(".waveform-swatch").forEach(function (btn) {
-    btn.addEventListener("click", function () { setWaveformColor(btn.getAttribute("data-color")); });
+    btn.addEventListener("click", function () {
+      setWaveformColor(btn.getAttribute("data-color"));
+    });
   });
   document.getElementById("hex-input").addEventListener("change", function (e) {
     var val = e.target.value;
@@ -143,19 +174,25 @@
       socialRegenBtn.disabled = true;
       socialRegenStatus.textContent = "Generating…";
       fetch(base + "/social/regenerate", { method: "POST" })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          return r.json();
+        })
         .then(function () {
           PS.streamStatus(base + "/social/status/stream", function (payload) {
             if (payload.status === "done") {
               socialPostInput.value = payload.social_post || "";
               if (youtubeTitleInput && !youtubeTitleInput.value) {
                 youtubeTitleInput.value = payload.youtube_title || "";
-                if (youtubeTitleCount) youtubeTitleCount.textContent = youtubeTitleInput.value.length + "/99";
+                if (youtubeTitleCount)
+                  youtubeTitleCount.textContent =
+                    youtubeTitleInput.value.length + "/99";
               }
-              socialRegenStatus.textContent = "Includes hashtags — same text works for both platforms.";
+              socialRegenStatus.textContent =
+                "Includes hashtags — same text works for both platforms.";
               socialRegenBtn.style.display = "none";
             } else if (payload.status === "error") {
-              socialRegenStatus.textContent = "Couldn't generate — check your text-generation provider in Settings.";
+              socialRegenStatus.textContent =
+                "Couldn't generate — check your text-generation provider in Settings.";
               socialRegenBtn.disabled = false;
             }
           });
@@ -167,8 +204,10 @@
   function parseAttachmentSource(value) {
     if (!value) return null;
     if (value === "episode_video") return { type: "episode_video" };
-    if (value.indexOf("clip:") === 0) return { type: "clip", clip_id: parseInt(value.slice(5), 10) };
-    if (value.indexOf("upload:") === 0) return { type: "upload", attachment_id: parseInt(value.slice(7), 10) };
+    if (value.indexOf("clip:") === 0)
+      return { type: "clip", clip_id: parseInt(value.slice(5), 10) };
+    if (value.indexOf("upload:") === 0)
+      return { type: "upload", attachment_id: parseInt(value.slice(7), 10) };
     return null;
   }
 
@@ -176,18 +215,30 @@
     var formData = new FormData();
     formData.append("file", file);
     formData.append("kind", kind);
-    fetch("/episodes/" + cfg.episodeId + "/social/attachments", { method: "POST", body: formData })
-      .then(function (r) { return r.json(); })
+    fetch("/episodes/" + cfg.episodeId + "/social/attachments", {
+      method: "POST",
+      body: formData,
+    })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function (data) {
-        if (data.ok === false) { onError(data.error || "Upload failed."); return; }
+        if (data.ok === false) {
+          onError(data.error || "Upload failed.");
+          return;
+        }
         onDone(data.attachment);
       })
-      .catch(function () { onError("Upload failed."); });
+      .catch(function () {
+        onError("Upload failed.");
+      });
   }
 
   var videoSourceSelect = document.getElementById("social-video-source");
   var imageSourceSelect = document.getElementById("social-image-source");
-  var thumbnailSourceSelect = document.getElementById("social-thumbnail-source");
+  var thumbnailSourceSelect = document.getElementById(
+    "social-thumbnail-source",
+  );
   var videoPreview = document.getElementById("social-video-preview");
   var imagePreview = document.getElementById("social-image-preview");
   var thumbnailPreview = document.getElementById("social-thumbnail-preview");
@@ -203,9 +254,24 @@
   // (only the "attach an image to the post" selector — not the thumbnail one, which isn't the
   // post's attached image and isn't subject to that requirement).
   var attachmentConfigs = [
-    { select: videoSourceSelect, kind: "video", preview: videoPreview, instagramNote: false },
-    { select: imageSourceSelect, kind: "image", preview: imagePreview, instagramNote: true },
-    { select: thumbnailSourceSelect, kind: "image", preview: thumbnailPreview, instagramNote: false },
+    {
+      select: videoSourceSelect,
+      kind: "video",
+      preview: videoPreview,
+      instagramNote: false,
+    },
+    {
+      select: imageSourceSelect,
+      kind: "image",
+      preview: imagePreview,
+      instagramNote: true,
+    },
+    {
+      select: thumbnailSourceSelect,
+      kind: "image",
+      preview: thumbnailPreview,
+      instagramNote: false,
+    },
   ];
 
   function updateAttachmentPreview(config) {
@@ -220,7 +286,10 @@
     }
     var el = document.createElement(config.kind === "video" ? "video" : "img");
     el.src = url;
-    if (config.kind === "video") { el.muted = true; el.setAttribute("playsinline", ""); }
+    if (config.kind === "video") {
+      el.muted = true;
+      el.setAttribute("playsinline", "");
+    }
     previewEl.appendChild(el);
     previewEl.classList.add("attachment-preview-visible");
   }
@@ -228,7 +297,8 @@
   function handleSourceSelectChange(config) {
     if (config.select.value === "__upload_" + config.kind + "__") {
       pendingUpload = config;
-      attachmentFileInput.accept = config.kind === "image" ? "image/*" : "video/*";
+      attachmentFileInput.accept =
+        config.kind === "image" ? "image/*" : "video/*";
       attachmentFileInput.value = "";
       attachmentFileInput.click();
     }
@@ -258,18 +328,27 @@
         target.select.value = option.value;
         updateAttachmentPreview(target);
         if (target.instagramNote && attachmentNote) {
-          attachmentNote.style.display = attachment.instagram_ok ? "none" : "block";
+          attachmentNote.style.display = attachment.instagram_ok
+            ? "none"
+            : "block";
           attachmentNote.textContent = attachment.instagram_ok
             ? ""
-            : "This image (" + attachment.width + "×" + attachment.height + ") doesn't fit Instagram's accepted range (4:5 to 1.91:1).";
+            : "This image (" +
+              attachment.width +
+              "×" +
+              attachment.height +
+              ") doesn't fit Instagram's accepted range (4:5 to 1.91:1).";
         }
         updatePublishHint();
       },
       function (message) {
         target.select.value = "";
         updateAttachmentPreview(target);
-        if (target.instagramNote && attachmentNote) { attachmentNote.style.display = "block"; attachmentNote.textContent = message; }
-      }
+        if (target.instagramNote && attachmentNote) {
+          attachmentNote.style.display = "block";
+          attachmentNote.textContent = message;
+        }
+      },
     );
   });
 
@@ -284,33 +363,49 @@
   var publishBtn = document.getElementById("publish-btn");
   if (publishBtn) {
     var publishStatus = document.getElementById("publish-status");
-    var publishDatetimeInput = document.getElementById("publish-datetime-input");
+    var publishDatetimeInput = document.getElementById(
+      "publish-datetime-input",
+    );
 
     function updatePublishModeUI() {
-      var scheduled = document.querySelector('input[name="publish-mode"][value="scheduled"]').checked;
+      var scheduled = document.querySelector(
+        'input[name="publish-mode"][value="scheduled"]',
+      ).checked;
       publishDatetimeInput.style.display = scheduled ? "inline-block" : "none";
     }
-    document.querySelectorAll('input[name="publish-mode"]').forEach(function (radio) {
-      radio.addEventListener("change", updatePublishModeUI);
-    });
+    document
+      .querySelectorAll('input[name="publish-mode"]')
+      .forEach(function (radio) {
+        radio.addEventListener("change", updatePublishModeUI);
+      });
     updatePublishModeUI();
 
     publishBtn.addEventListener("click", function () {
       var platforms = Array.prototype.slice
         .call(document.querySelectorAll(".publish-platform-checkbox:checked"))
-        .map(function (cb) { return cb.value; });
+        .map(function (cb) {
+          return cb.value;
+        });
       if (!platforms.length) {
         publishStatus.textContent = "Select at least one platform.";
         return;
       }
-      var videoSource = parseAttachmentSource(videoSourceSelect ? videoSourceSelect.value : "");
+      var videoSource = parseAttachmentSource(
+        videoSourceSelect ? videoSourceSelect.value : "",
+      );
       if (!videoSource) {
         publishStatus.textContent = "Pick a video to attach.";
         return;
       }
-      var imageSource = parseAttachmentSource(imageSourceSelect ? imageSourceSelect.value : "");
-      var thumbnailSource = parseAttachmentSource(thumbnailSourceSelect ? thumbnailSourceSelect.value : "");
-      var mode = document.querySelector('input[name="publish-mode"]:checked').value;
+      var imageSource = parseAttachmentSource(
+        imageSourceSelect ? imageSourceSelect.value : "",
+      );
+      var thumbnailSource = parseAttachmentSource(
+        thumbnailSourceSelect ? thumbnailSourceSelect.value : "",
+      );
+      var mode = document.querySelector(
+        'input[name="publish-mode"]:checked',
+      ).value;
       var scheduledAt = null;
       if (mode === "scheduled") {
         if (!publishDatetimeInput.value) {
@@ -333,34 +428,59 @@
           thumbnail_source: thumbnailSource,
         }),
       })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          return r.json();
+        })
         .then(function (data) {
           if (data.ok === false) {
             publishStatus.textContent = data.error || "Couldn't publish.";
             publishBtn.disabled = false;
             return;
           }
-          PS.streamStatus(base + "/social/publish/status/stream", function (payload) {
-            if (payload.status === "running") {
-              publishStatus.textContent = "Publishing…";
-              return;
-            }
-            if (payload.status !== "done" && payload.status !== "error") return;
-            var results = payload.publishes || [];
-            results.forEach(function (r) {
-              var el = document.querySelector('.publish-platform-status[data-platform="' + r.platform + '"]');
-              if (el) {
-                el.textContent = r.status === "done"
-                  ? "· published"
-                  : "· failed" + (r.error_message ? " — " + r.error_message : "");
+          PS.streamStatus(
+            base + "/social/publish/status/stream",
+            function (payload) {
+              if (payload.status === "running") {
+                publishStatus.textContent = "Publishing…";
+                return;
               }
-            });
-            var okCount = results.filter(function (r) { return r.status === "done"; }).length;
-            publishStatus.textContent = results.length && okCount === results.length
-              ? "Published to " + okCount + " platform" + (okCount > 1 ? "s" : "") + "."
-              : okCount + "/" + results.length + " succeeded" + (payload.error_message ? " — " + payload.error_message : "");
-            publishBtn.disabled = false;
-          });
+              if (payload.status !== "done" && payload.status !== "error")
+                return;
+              var results = payload.publishes || [];
+              results.forEach(function (r) {
+                var el = document.querySelector(
+                  '.publish-platform-status[data-platform="' +
+                    r.platform +
+                    '"]',
+                );
+                if (el) {
+                  el.textContent =
+                    r.status === "done"
+                      ? "· published"
+                      : "· failed" +
+                        (r.error_message ? " — " + r.error_message : "");
+                }
+              });
+              var okCount = results.filter(function (r) {
+                return r.status === "done";
+              }).length;
+              publishStatus.textContent =
+                results.length && okCount === results.length
+                  ? "Published to " +
+                    okCount +
+                    " platform" +
+                    (okCount > 1 ? "s" : "") +
+                    "."
+                  : okCount +
+                    "/" +
+                    results.length +
+                    " succeeded" +
+                    (payload.error_message
+                      ? " — " + payload.error_message
+                      : "");
+              publishBtn.disabled = false;
+            },
+          );
         });
     });
   }
@@ -373,7 +493,8 @@
 
   // --- Drag the waveform band up/down (vertical-only — x never changes) ---
   var waveformBand = document.getElementById("waveform-band");
-  var WAVEFORM_OFFSET_MIN = cfg.waveformOffsetMin, WAVEFORM_OFFSET_MAX = cfg.waveformOffsetMax;
+  var WAVEFORM_OFFSET_MIN = cfg.waveformOffsetMin,
+    WAVEFORM_OFFSET_MAX = cfg.waveformOffsetMax;
   var waveformOffsetY = cfg.waveformOffsetY || 0;
   var waveDrag = null;
 
@@ -385,7 +506,10 @@
   waveformBand.addEventListener("pointermove", function (e) {
     if (!waveDrag) return;
     var next = waveDrag.offY + (e.clientY - waveDrag.y);
-    waveformOffsetY = Math.max(WAVEFORM_OFFSET_MIN, Math.min(WAVEFORM_OFFSET_MAX, next));
+    waveformOffsetY = Math.max(
+      WAVEFORM_OFFSET_MIN,
+      Math.min(WAVEFORM_OFFSET_MAX, next),
+    );
     waveformBand.style.transform = "translateY(" + waveformOffsetY + "px)";
   });
   function endWaveDrag() {
@@ -404,17 +528,23 @@
     exportBtn.disabled = true;
     exportStatus.textContent = "Starting export…";
     fetch(base + "/export", { method: "POST" })
-      .then(function (r) { return r.json(); })
+      .then(function (r) {
+        return r.json();
+      })
       .then(function () {
         PS.streamStatus(base + "/status/stream", function (payload) {
           if (payload.status === "running") {
-            exportStatus.textContent = "Exporting… " + (payload.progress_pct || 0) + "%";
+            exportStatus.textContent =
+              "Exporting… " + (payload.progress_pct || 0) + "%";
           } else if (payload.status === "done") {
             exportStatus.textContent = "Export complete — downloading…";
             window.location.href = base + "/download";
-            setTimeout(function () { window.location.reload(); }, 600);
+            setTimeout(function () {
+              window.location.reload();
+            }, 600);
           } else if (payload.status === "error") {
-            exportStatus.textContent = "Export failed: " + (payload.error_message || "unknown error");
+            exportStatus.textContent =
+              "Export failed: " + (payload.error_message || "unknown error");
             exportBtn.disabled = false;
           }
         });
@@ -429,7 +559,9 @@
       duplicateBtn.disabled = true;
       duplicateStatus.textContent = "Duplicating…";
       fetch(base + "/duplicate", { method: "POST" })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          return r.json();
+        })
         .then(function (data) {
           if (data.ok === false) {
             duplicateStatus.textContent = data.error || "Couldn't duplicate.";
