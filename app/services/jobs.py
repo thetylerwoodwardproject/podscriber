@@ -67,6 +67,14 @@ def submit_social_regenerate(job_id: int, tone: str) -> None:
     submit_job(job_id, run_social_regenerate, tone, guarded=False)
 
 
+def submit_soundbite_regenerate(job_id: int) -> None:
+    from app.services.soundbite_regen import run_soundbite_regenerate
+
+    # guarded=False, same reasoning as submit_social_regenerate: a failed manual regenerate
+    # of an already-processed episode's soundbites shouldn't flip the whole episode to "error".
+    submit_job(job_id, run_soundbite_regenerate, guarded=False)
+
+
 def submit_clip_social_regenerate(job_id: int) -> None:
     from app.services.clip_social_regen import run_clip_social_regenerate
 
@@ -82,13 +90,16 @@ def submit_clip_social_publish(
     scheduled_at: str | None,
     video_source: dict | None,
     image_source: dict | None,
+    thumbnail_source: dict | None,
 ) -> None:
     from app.services.clip_social_publish import run_clip_social_publish
 
     # guarded=False, same reasoning as submit_social_regenerate: a failed publish attempt
     # shouldn't flip the whole episode to "error" — per-platform failures are recorded on
     # SocialPublish rows, and run_clip_social_publish handles its own job-level reporting.
-    submit_job(job_id, run_clip_social_publish, platforms, mode, scheduled_at, video_source, image_source, guarded=False)
+    submit_job(
+        job_id, run_clip_social_publish, platforms, mode, scheduled_at, video_source, image_source, thumbnail_source, guarded=False
+    )
 
 
 def submit_episode_social_publish(job_id: int, selections: list[dict], mode: str, scheduled_at: str | None) -> None:

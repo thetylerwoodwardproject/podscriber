@@ -1,3 +1,4 @@
+import logging
 import shutil
 from datetime import UTC
 from pathlib import Path
@@ -7,10 +8,13 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.models import Chapter, Episode, GeneratedContent, Job, Soundbite, Transcript, TranscriptSegment, VideoClip
 from app.services import storage
+from app.services.audio_clip import clip_soundbite_audio
 from app.services.llm.factory import get_llm_provider
 from app.services.soundbite_matching import match_quote_to_timestamps, quote_coverage
 from app.services.transcription.base import TranscriptResult
 from app.services.transcription.factory import get_transcription_provider
+
+logger = logging.getLogger("podscriber.pipeline")
 
 STEP_KEYS = ["transcribing", "titles", "description", "social", "soundbites", "chapters"]
 STEP_LABELS = {
@@ -50,6 +54,69 @@ def reset_episode_for_retry(db: Session, episode: Episode) -> None:
 
     for dir_fn in (storage.clips_dir, storage.images_dir, storage.video_dir):
         shutil.rmtree(dir_fn(episode.id), ignore_errors=True)
+
+
+def build_soundbites(
+    db: Session, episode: Episode, transcript_text: str, segments: list[TranscriptSegment], llm
+) -> list[Soundbite]:
+    """Selects, verbatim-matches, and saves soundbites for an episode, then clips their
+    audio and pre-creates a `VideoClip` (with social copy) for each. Shared by the main
+    processing pipeline's soundbites step and the standalone "regenerate soundbites" job
+    so both go through the same LLM-selection + verbatim-matching + clip-building logic.
+    """
+    candidates = llm.select_soundbites(transcript_text)
+    if not candidates:
+        logger.warning("Episode %s: select_soundbites returned no candidates", episode.id)
+
+    new_soundbites: list[Soundbite] = []
+    order_index = 0
+    for cand in candidates:
+        # A local model can occasionally leak reasoning/retry text into a schema-valid
+        # "quote" field instead of an actual transcript excerpt. Requiring most of it to
+        # match verbatim keeps that garbage from being saved and shown as a soundbite.
+        coverage = quote_coverage(segments, cand.quote)
+        if coverage < 0.5:
+            logger.warning(
+                "Episode %s: discarding soundbite candidate (coverage=%.2f < 0.5): %r",
+                episode.id,
+                coverage,
+                cand.quote[:200],
+            )
+            continue
+        start_ms, end_ms = match_quote_to_timestamps(segments, cand.quote)
+        sb = Soundbite(
+            episode_id=episode.id,
+            quote=cand.quote,
+            start_ms=start_ms,
+            end_ms=end_ms,
+            include=True,
+            order_index=order_index,
+        )
+        db.add(sb)
+        new_soundbites.append(sb)
+        order_index += 1
+    db.commit()
+
+    for sb in new_soundbites:
+        try:
+            clip_soundbite_audio(episode, sb)
+        except Exception:
+            pass  # a clipping failure shouldn't fail the whole pipeline; playback/download will just 404
+
+        # Pre-create the VideoClip and its social copy so the soundbite's video editor
+        # opens ready to adjust art/export, instead of requiring a manual "Create video"
+        # + "Generate" click first.
+        clip = VideoClip(soundbite_id=sb.id)
+        db.add(clip)
+        try:
+            clip_social = llm.generate_clip_social(sb.quote, episode.title or episode.original_filename)
+            clip.social_post = clip_social.social_post
+            clip.youtube_title = clip_social.youtube_title
+        except Exception:
+            pass  # clip stays with empty social copy; can be regenerated from the editor
+    db.commit()
+
+    return new_soundbites
 
 
 def save_transcript(db: Session, episode: Episode, result: TranscriptResult, provider_name: str) -> Transcript:
@@ -143,30 +210,9 @@ def run_episode_processing(job_id: int) -> None:
             db.commit()
 
         # --- Step 5: soundbites ---
-        new_soundbites: list[Soundbite] = []
         if "soundbites" in steps:
             _set_step(job, "soundbites", db)
-            candidates = llm.select_soundbites(transcript_text)
-            order_index = 0
-            for cand in candidates:
-                # A local model can occasionally leak reasoning/retry text into a schema-valid
-                # "quote" field instead of an actual transcript excerpt. Requiring most of it to
-                # match verbatim keeps that garbage from being saved and shown as a soundbite.
-                if quote_coverage(segments, cand.quote) < 0.5:
-                    continue
-                start_ms, end_ms = match_quote_to_timestamps(segments, cand.quote)
-                sb = Soundbite(
-                    episode_id=episode.id,
-                    quote=cand.quote,
-                    start_ms=start_ms,
-                    end_ms=end_ms,
-                    include=True,
-                    order_index=order_index,
-                )
-                db.add(sb)
-                new_soundbites.append(sb)
-                order_index += 1
-            db.commit()
+            build_soundbites(db, episode, transcript_text, segments, llm)
 
         # --- Step 6: chapters ---
         if "chapters" in steps:
@@ -182,28 +228,6 @@ def run_episode_processing(job_id: int) -> None:
             for i, (start_ms, title) in enumerate(chapter_rows):
                 db.add(Chapter(episode_id=episode.id, index=i, title=title, start_ms=start_ms))
             db.commit()
-
-        # --- clip soundbite audio and pre-build its video clip now that timestamps are known ---
-        from app.services.audio_clip import clip_soundbite_audio
-
-        for sb in new_soundbites:
-            try:
-                clip_soundbite_audio(episode, sb)
-            except Exception:
-                pass  # a clipping failure shouldn't fail the whole pipeline; playback/download will just 404
-
-            # Pre-create the VideoClip and its social copy so the soundbite's video editor
-            # opens ready to adjust art/export, instead of requiring a manual "Create video"
-            # + "Generate" click first.
-            clip = VideoClip(soundbite_id=sb.id)
-            db.add(clip)
-            try:
-                clip_social = llm.generate_clip_social(sb.quote, episode.title or episode.original_filename)
-                clip.social_post = clip_social.social_post
-                clip.youtube_title = clip_social.youtube_title
-            except Exception:
-                pass  # clip stays with empty social copy; can be regenerated from the editor
-        db.commit()
 
         job.status = "done"
         job.progress_pct = 100

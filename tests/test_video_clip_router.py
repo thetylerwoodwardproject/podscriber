@@ -87,6 +87,32 @@ def test_video_editor_entry_reuses_earliest_existing_clip(db):
     assert response.headers["location"] == f"/episodes/{episode.id}/soundbites/{sb.id}/video/{first.id}"
 
 
+def test_publish_clip_social_rejects_invalid_thumbnail_source(db, monkeypatch):
+    import asyncio
+
+    episode, sb = _make_episode_with_soundbite(db)
+    clip = _make_clip(db, sb.id, exported_video_path="/media/clip.mp4")
+    submitted = []
+    monkeypatch.setattr(
+        video_clip_router, "submit_clip_social_publish", lambda *a, **k: submitted.append(a)
+    )
+
+    class _FakeRequest:
+        async def json(self):
+            return {
+                "platforms": ["x"],
+                "mode": "now",
+                "video_source": {"type": "clip", "clip_id": clip.id},
+                "thumbnail_source": {"type": "upload", "attachment_id": 999999},
+            }
+
+    result = asyncio.run(video_clip_router.publish_clip_social(episode.id, sb.id, clip.id, _FakeRequest(), db))
+
+    assert result["ok"] is False
+    assert "not found" in result["error"]
+    assert submitted == []
+
+
 def test_export_selected_videos_targets_first_clip_per_soundbite(db, monkeypatch):
     import asyncio
 

@@ -10,6 +10,11 @@ from app.db import SessionLocal
 from app.models import Job, VideoClip
 from app.services import storage
 from app.services.llm.factory import get_llm_provider
+from app.services.video_editor_shared import (
+    loudnorm_filter,
+    measure_loudness,
+    waveform_colorchannelmixer_expr,
+)
 
 logger = logging.getLogger("podscriber.video_export")
 
@@ -119,10 +124,7 @@ def run_video_export(job_id: int) -> None:
             job.progress_pct = 60
             db.commit()
 
-            color_hex = (clip.waveform_color or "#e2572c").lstrip("#")
-            if len(color_hex) not in (6, 8):
-                color_hex = "e2572c"
-            ffmpeg_color = f"0x{color_hex}"
+            recolor_expr = waveform_colorchannelmixer_expr(clip.waveform_color)
 
             # Keyed by clip id, not soundbite id: a soundbite can have several video
             # variants (duplicates), and they must not overwrite each other's export file.
@@ -137,19 +139,28 @@ def run_video_export(job_id: int) -> None:
             # output makes the render duration deterministic regardless of that filter-graph
             # interaction; `-shortest` is kept only as a secondary safety net.
             duration_s = _probe_duration_seconds(soundbite.clip_audio_path)
+            loudness_stats = measure_loudness(soundbite.clip_audio_path)
 
             # showwaves renders on an opaque black canvas (no alpha channel) — composited directly,
             # that black canvas would paint a solid rectangle over the background instead of just
             # the waveform line. colorkey keys out that black background to transparent so overlay
-            # only draws the waveform itself.
+            # only draws the waveform itself. The waveform is always drawn in fixed white, then
+            # recolored to the user's actual waveform_color afterward — see
+            # waveform_colorchannelmixer_expr's docstring for why drawing directly in the
+            # requested color (rather than white) breaks for black/near-black choices.
             filter_complex = (
                 "[1:a]asplit=2[a1][a2];"
+                # a2 feeds the actual output audio; normalize it to -14 LUFS with the exact
+                # correction from the measure_loudness() pre-pass above. a1 (the waveform
+                # visualization source) is left at its original level so the on-screen shape
+                # doesn't shift.
+                f"[a2]{loudnorm_filter(loudness_stats)}[anorm];"
                 # draw=full (vs. the default draw=scale) draws each sample as a solid pixel of
                 # `colors` rather than scaling its value by amplitude — on real speech (dense,
                 # fast-changing, unlike a clean test tone) draw=scale's per-sample blending pushes
                 # overlapping samples toward red regardless of the requested color.
-                f"[a1]showwaves=s={WAVEFORM_W}x{WAVEFORM_H}:mode=cline:rate=25:colors={ffmpeg_color}:draw=full,"
-                "format=rgba,colorkey=0x000000:0.15:0.1[wave];"
+                f"[a1]showwaves=s={WAVEFORM_W}x{WAVEFORM_H}:mode=cline:rate=25:colors=0xffffff:draw=full,"
+                f"format=rgba,colorkey=0x000000:0.15:0.1,{recolor_expr}[wave];"
                 # x is always centered and fixed; y is the static position (base layout + the
                 # user's dragged offset, already resolved in _composite_base_frame) — vertical
                 # placement only, no horizontal motion.
@@ -160,7 +171,7 @@ def run_video_export(job_id: int) -> None:
                 "-loop", "1", "-i", str(base_frame_path),
                 "-i", soundbite.clip_audio_path,
                 "-filter_complex", filter_complex,
-                "-map", "[vout]", "-map", "[a2]",
+                "-map", "[vout]", "-map", "[anorm]",
                 "-c:v", "libx264", "-preset", "medium", "-crf", "20",
                 "-c:a", "aac", "-b:a", "192k",
                 "-t", f"{duration_s:.3f}",

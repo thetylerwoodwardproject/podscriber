@@ -7,6 +7,10 @@ editor (`app/routers/video_full.py`). Both operate on a record (`VideoClip` /
 waveform-offset clamp range differ per record type, so those stay with each caller.
 """
 
+import json
+import re
+import subprocess
+
 from fastapi import UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse
 
@@ -14,6 +18,10 @@ from app.routers._shared import sanitize_download_filename
 from app.services import storage
 
 _ALLOWED_IMAGE_EXTENSIONS = ("png", "jpg", "jpeg", "webp")
+
+LOUDNORM_I = -14.0   # integrated loudness target (LUFS)
+LOUDNORM_TP = -1.5   # true peak ceiling (dBTP)
+LOUDNORM_LRA = 11.0  # loudness range target (LU)
 
 
 async def save_clip_image(episode_id: int, file: UploadFile, filename_stem: str) -> tuple[str, str]:
@@ -41,6 +49,65 @@ def apply_clip_settings(record, body: dict, *, waveform_offset_range: tuple[int,
         record.waveform_color = str(body["waveform_color"])[:20]
     if "download_filename" in body:
         record.download_filename = str(body["download_filename"])[:80] or None
+
+
+def waveform_colorchannelmixer_expr(color: str | None) -> str:
+    """Builds a `colorchannelmixer` ffmpeg filter expression that recolors a
+    white-on-black `showwaves` render to the user's chosen `waveform_color`.
+
+    Both video exporters draw the waveform fixed white (`colors=0xffffff`) and key
+    showwaves' opaque black canvas to transparent via `colorkey=0x000000:0.15:0.1`,
+    then apply this filter to remap the surviving white strokes to the actual
+    requested color while leaving alpha untouched.
+
+    Drawing directly in the user's color (the previous approach) collided with the
+    colorkey step whenever that color was black or any other very dark color: with a
+    similarity of 0.15, colorkey keys out anything within a wide radius of pure
+    black, including near-black draw colors — not just an exact `#000000` match — so
+    the waveform strokes got keyed out along with the background, leaving a blank
+    waveform. Always drawing in white keeps the draw color at maximum distance from
+    the black key regardless of what the user picks, then this filter restores the
+    intended color afterward.
+    """
+    color_hex = (color or "#e2572c").lstrip("#")
+    if len(color_hex) not in (6, 8):
+        color_hex = "e2572c"
+    r, g, b = int(color_hex[0:2], 16), int(color_hex[2:4], 16), int(color_hex[4:6], 16)
+    kr, kg, kb = r / 255, g / 255, b / 255
+    return (
+        f"colorchannelmixer=rr={kr:.6f}:rg=0:rb=0:ra=0:"
+        f"gr={kg:.6f}:gg=0:gb=0:ga=0:"
+        f"br={kb:.6f}:bg=0:bb=0:ba=0:"
+        "ar=0:ag=0:ab=0:aa=1"
+    )
+
+
+def measure_loudness(audio_path: str, *, timeout: int = 120) -> dict:
+    """Runs ffmpeg's loudnorm filter in analysis-only mode and returns its measured
+    stats dict (input_i, input_tp, input_lra, input_thresh, target_offset), needed to
+    apply an exact second-pass correction via loudnorm_filter().
+    """
+    cmd = [
+        "ffmpeg", "-i", audio_path,
+        "-af", f"loudnorm=I={LOUDNORM_I}:TP={LOUDNORM_TP}:LRA={LOUDNORM_LRA}:print_format=json",
+        "-f", "null", "-",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    # loudnorm prints its JSON report to stderr, after all of ffmpeg's normal logging.
+    match = re.search(r"\{[^{}]*\}\s*$", result.stderr.strip())
+    if not match:
+        raise RuntimeError("ffmpeg loudnorm measurement did not produce a JSON report")
+    return json.loads(match.group(0))
+
+
+def loudnorm_filter(stats: dict) -> str:
+    """Builds the second-pass loudnorm filter string from measure_loudness()'s output."""
+    return (
+        f"loudnorm=I={LOUDNORM_I}:TP={LOUDNORM_TP}:LRA={LOUDNORM_LRA}:"
+        f"measured_I={stats['input_i']}:measured_TP={stats['input_tp']}:"
+        f"measured_LRA={stats['input_lra']}:measured_thresh={stats['input_thresh']}:"
+        f"offset={stats['target_offset']}:linear=true"
+    )
 
 
 def download_response(record, fallback_stem: str) -> FileResponse | PlainTextResponse:

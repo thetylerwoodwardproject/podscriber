@@ -1,6 +1,9 @@
 import logging
+import subprocess
+import tempfile
 import traceback
 from datetime import UTC, datetime
+from pathlib import Path
 
 from app.db import SessionLocal
 from app.models import Episode, Job, VideoClip
@@ -17,6 +20,7 @@ from app.services.social_publish import (
     record_publish_error,
     resolve_integrations,
 )
+from app.services.video_thumbnail import prepend_thumbnail_frame
 
 logger = logging.getLogger("podscriber.jobs")
 
@@ -28,12 +32,15 @@ def run_clip_social_publish(
     scheduled_at: str | None,
     video_source: dict | None,
     image_source: dict | None,
+    thumbnail_source: dict | None,
 ) -> None:
-    """`video_source`/`image_source` are re-resolved server-side against the DB (see
-    `app.services.social_attachments`) rather than trusted from the client. A video source
-    is required — the clip flow keeps mandatory video attach — but it no longer has to be
-    the clip's own export; it can be any already-exported video in the episode, or an
-    uploaded one."""
+    """`video_source`/`image_source`/`thumbnail_source` are re-resolved server-side against the
+    DB (see `app.services.social_attachments`) rather than trusted from the client. A video
+    source is required — the clip flow keeps mandatory video attach — but it no longer has to be
+    the clip's own export; it can be any already-exported video in the episode, or an uploaded
+    one. `thumbnail_source` is an optional cover image: YouTube gets it via Postiz's native
+    `settings.thumbnail` field, every other selected platform gets it prepended as the video's
+    first frame (see `video_thumbnail.prepend_thumbnail_frame`)."""
     db = SessionLocal()
     try:
         job = db.get(Job, job_id)
@@ -70,6 +77,13 @@ def run_clip_social_publish(
             db.commit()
             return
 
+        thumbnail_attachment, thumbnail_err = resolve_image_attachment(db, episode, thumbnail_source)
+        if thumbnail_source and thumbnail_err:
+            job.status = "error"
+            job.error_message = thumbnail_err
+            db.commit()
+            return
+
         instagram_err = validate_instagram_requirement(platforms, image_attachment, has_video=bool(video_path))
         if instagram_err:
             for platform in platforms:
@@ -99,24 +113,42 @@ def run_clip_social_publish(
             return
 
         try:
-            media_items = [upload_media(base_url, api_key, video_path)]
+            original_media = upload_media(base_url, api_key, video_path)
+            image_media = None
             if image_attachment:
-                media_items.append(
-                    upload_media(base_url, api_key, image_attachment.file_path, content_type=image_attachment.content_type)
+                image_media = upload_media(
+                    base_url, api_key, image_attachment.file_path, content_type=image_attachment.content_type
                 )
-        except PostizError as exc:
-            # Record the same upload failure against every requested platform, since the
-            # editor's status list reads per-platform SocialPublish rows, not the job itself.
+
+            youtube_thumbnail_media = None
+            prepended_media = None
+            if thumbnail_attachment:
+                if "youtube" in platforms:
+                    youtube_thumbnail_media = upload_media(
+                        base_url, api_key, thumbnail_attachment.file_path, content_type=thumbnail_attachment.content_type
+                    )
+                if any(p != "youtube" for p in platforms):
+                    with tempfile.TemporaryDirectory() as tmp:
+                        prepended_path = Path(tmp) / f"thumb-{clip.id}.mp4"
+                        prepend_thumbnail_frame(video_path, thumbnail_attachment.file_path, prepended_path)
+                        prepended_media = upload_media(base_url, api_key, str(prepended_path))
+        except (PostizError, OSError, subprocess.SubprocessError) as exc:
+            # Record the same upload/prepare failure against every requested platform, since
+            # the editor's status list reads per-platform SocialPublish rows, not the job itself.
             for platform in platforms:
                 record_publish_error(db, job=job, platform=platform, message=str(exc), video_clip_id=clip.id)
             job.status = "error"
-            job.error_message = f"Couldn't upload media to Postiz: {exc}"
+            job.error_message = f"Couldn't prepare media for Postiz: {exc}"
             db.commit()
             return
 
         any_ok = False
         for platform in platforms:
-            settings = default_settings_for_platform(platform, youtube_title=clip.youtube_title)
+            video_media = original_media if platform == "youtube" else (prepended_media or original_media)
+            media_items = [video_media] + ([image_media] if image_media else [])
+            settings = default_settings_for_platform(
+                platform, youtube_title=clip.youtube_title, youtube_thumbnail=youtube_thumbnail_media
+            )
             ok = publish_one_platform(
                 db,
                 job=job,

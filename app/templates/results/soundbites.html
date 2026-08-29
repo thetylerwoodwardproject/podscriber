@@ -1,3 +1,10 @@
+<div id="soundbites-regen-bar" data-episode-id="{{ episode.id }}" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;max-width:760px">
+  <button type="button" id="soundbites-regen-btn" class="btn btn-outline" style="padding:7px 12px;font-size:12.5px">Regenerate soundbites</button>
+  <span id="soundbites-regen-status" style="display:none;align-items:center;gap:8px;font-size:13px;color:var(--muted)">
+    <span id="soundbites-regen-spinner" style="display:none;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0"></span>
+    <span id="soundbites-regen-status-text"></span>
+  </span>
+</div>
 {% if soundbites %}
 <div id="soundbites-bulk-bar" style="display:flex;align-items:center;gap:14px;margin-bottom:14px;max-width:760px">
   <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted-light)">
@@ -49,3 +56,48 @@
   <div class="empty-state">No soundbites found for this episode.</div>
   {% endfor %}
 </div>
+<script>
+(function () {
+  var bar = document.getElementById("soundbites-regen-bar");
+  var episodeId = bar.getAttribute("data-episode-id");
+  var regenBtn = document.getElementById("soundbites-regen-btn");
+  var regenStatus = document.getElementById("soundbites-regen-status");
+  var regenSpinner = document.getElementById("soundbites-regen-spinner");
+  var regenStatusText = document.getElementById("soundbites-regen-status-text");
+  var base = "/episodes/" + episodeId;
+
+  function showStatus(text, spinning) {
+    regenStatusText.textContent = text;
+    regenSpinner.style.display = spinning ? "inline-block" : "none";
+    regenStatus.style.display = "inline-flex";
+  }
+  function hideStatus() {
+    regenStatus.style.display = "none";
+  }
+
+  regenBtn.addEventListener("click", function () {
+    regenBtn.disabled = true;
+    showStatus("Regenerating…", true);
+
+    fetch(base + "/soundbites/regenerate", { method: "POST" })
+      .then(function (r) { return r.json(); })
+      .then(function () {
+        var source = new EventSource(base + "/soundbites/regenerate/status/stream");
+        source.onmessage = function (evt) {
+          var payload = JSON.parse(evt.data);
+          if (payload.status === "done") {
+            source.close();
+            // Reload rather than swap the list's HTML in place: soundbites.js binds its
+            // play/export/video-variant handlers to elements at page load, not via
+            // delegation, so an in-place swap would leave the new cards unwired.
+            window.location.reload();
+          } else if (payload.status === "error") {
+            source.close();
+            showStatus(payload.error_message || "Couldn't regenerate — check your text-generation provider in Settings and try again.", false);
+            regenBtn.disabled = false;
+          }
+        };
+      });
+  });
+})();
+</script>

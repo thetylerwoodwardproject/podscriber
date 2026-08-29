@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from app.services import pipeline, storage
@@ -125,3 +126,61 @@ def test_run_episode_processing_only_runs_selected_steps(db, tmp_path, monkeypat
     assert episode.generated_content.social_posts == []
     assert episode.soundbites == []
     assert episode.chapters == []
+
+
+def _make_soundbite_episode(db, tmp_path, monkeypatch):
+    from app.models import Episode, Transcript, TranscriptSegment
+
+    monkeypatch.setattr(storage.config, "media_dir", tmp_path)
+    episode = Episode(title="Ep", original_filename="ep.mp3", file_path=str(tmp_path / "ep.mp3"), status="processing")
+    db.add(episode)
+    db.commit()
+    db.refresh(episode)
+
+    transcript = Transcript(episode_id=episode.id, full_text="someone elses guess", provider="local_whisper")
+    db.add(transcript)
+    db.flush()
+    words = [
+        {"word": w, "start_ms": i * 500, "end_ms": 500 + i * 500}
+        for i, w in enumerate(["someone", "elses", "guess"])
+    ]
+    db.add(TranscriptSegment(transcript_id=transcript.id, index=0, start_ms=0, end_ms=1500, text="someone elses guess", words=words))
+    db.commit()
+    db.refresh(episode)
+    return episode
+
+
+class _EmptyLLMProvider:
+    def select_soundbites(self, transcript_text):
+        return []
+
+
+class _LowCoverageLLMProvider:
+    def select_soundbites(self, transcript_text):
+        from app.services.llm.base import SoundbiteCandidate
+
+        return [SoundbiteCandidate(quote="completely unrelated text never in the transcript")]
+
+
+def test_build_soundbites_logs_warning_on_empty_llm_result(db, tmp_path, monkeypatch, caplog):
+    episode = _make_soundbite_episode(db, tmp_path, monkeypatch)
+
+    with caplog.at_level(logging.WARNING, logger="podscriber.pipeline"):
+        result = pipeline.build_soundbites(db, episode, "someone elses guess", list(episode.transcript.segments), _EmptyLLMProvider())
+
+    assert result == []
+    assert episode.soundbites == []
+    assert any("no candidates" in r.message for r in caplog.records)
+
+
+def test_build_soundbites_logs_warning_when_candidate_discarded_for_low_coverage(db, tmp_path, monkeypatch, caplog):
+    episode = _make_soundbite_episode(db, tmp_path, monkeypatch)
+
+    with caplog.at_level(logging.WARNING, logger="podscriber.pipeline"):
+        result = pipeline.build_soundbites(
+            db, episode, "someone elses guess", list(episode.transcript.segments), _LowCoverageLLMProvider()
+        )
+
+    assert result == []
+    assert episode.soundbites == []
+    assert any("discarding soundbite candidate" in r.message for r in caplog.records)

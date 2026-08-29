@@ -8,6 +8,11 @@ from PIL import Image, ImageDraw, ImageEnhance
 from app.db import SessionLocal
 from app.models import Episode, Job
 from app.services import storage
+from app.services.video_editor_shared import (
+    loudnorm_filter,
+    measure_loudness,
+    waveform_colorchannelmixer_expr,
+)
 from app.services.video_export import _cover_fit, _probe_duration_seconds
 
 CANVAS_W, CANVAS_H = 1920, 1080
@@ -87,10 +92,7 @@ def run_full_video_export(job_id: int) -> None:
             job.progress_pct = 60
             db.commit()
 
-            color_hex = (video.waveform_color or "#e2572c").lstrip("#")
-            if len(color_hex) not in (6, 8):
-                color_hex = "e2572c"
-            ffmpeg_color = f"0x{color_hex}"
+            recolor_expr = waveform_colorchannelmixer_expr(video.waveform_color)
 
             out_path = storage.video_dir(episode.id) / f"episode-{episode.id}.mp4"
 
@@ -100,11 +102,21 @@ def run_full_video_export(job_id: int) -> None:
             # frames faster than the muxer catches up. An explicit `-t` bound makes render
             # duration deterministic; `-shortest` stays as a secondary safety net.
             duration_s = _probe_duration_seconds(episode.file_path)
+            # Analysis-only decode, no video work — scaled the same way the render timeout
+            # below is, just with a lower floor/multiplier since it's cheaper per second.
+            loudness_stats = measure_loudness(episode.file_path, timeout=max(120, int(duration_s * 1.5)))
 
+            # Waveform is always drawn fixed white then recolored to the user's actual
+            # waveform_color afterward — see waveform_colorchannelmixer_expr's docstring for
+            # why drawing directly in the requested color breaks for black/near-black choices.
             filter_complex = (
                 "[1:a]asplit=2[a1][a2];"
-                f"[a1]showwaves=s={WAVEFORM_W}x{WAVEFORM_H}:mode=cline:rate=25:colors={ffmpeg_color}:draw=full,"
-                "format=rgba,colorkey=0x000000:0.15:0.1[wave];"
+                # a2 feeds the output audio; normalize it to -14 LUFS using the exact
+                # correction from the measure_loudness() pre-pass above. a1 (the waveform
+                # visualization source) stays at its original level.
+                f"[a2]{loudnorm_filter(loudness_stats)}[anorm];"
+                f"[a1]showwaves=s={WAVEFORM_W}x{WAVEFORM_H}:mode=cline:rate=25:colors=0xffffff:draw=full,"
+                f"format=rgba,colorkey=0x000000:0.15:0.1,{recolor_expr}[wave];"
                 f"[0:v][wave]overlay=x=(W-w)/2:y={waveform_top_y}:format=auto,format=yuv420p[vout]"
             )
             cmd = [
@@ -112,7 +124,7 @@ def run_full_video_export(job_id: int) -> None:
                 "-loop", "1", "-i", str(base_frame_path),
                 "-i", episode.file_path,
                 "-filter_complex", filter_complex,
-                "-map", "[vout]", "-map", "[a2]",
+                "-map", "[vout]", "-map", "[anorm]",
                 "-c:v", "libx264", "-preset", "medium", "-crf", "20",
                 "-c:a", "aac", "-b:a", "192k",
                 "-t", f"{duration_s:.3f}",

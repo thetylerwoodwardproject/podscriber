@@ -235,6 +235,7 @@ async def publish_clip_social(episode_id: int, soundbite_id: int, clip_id: int, 
     scheduled_at = str(body["scheduled_at"]) if mode == "scheduled" and body.get("scheduled_at") else None
     video_source = body.get("video_source") if isinstance(body.get("video_source"), dict) else None
     image_source = body.get("image_source") if isinstance(body.get("image_source"), dict) else None
+    thumbnail_source = body.get("thumbnail_source") if isinstance(body.get("thumbnail_source"), dict) else None
 
     if not platforms or (mode == "scheduled" and not scheduled_at):
         return {"ok": False, "error": "Select at least one platform (and a date/time, if scheduling)."}
@@ -246,6 +247,9 @@ async def publish_clip_social(episode_id: int, soundbite_id: int, clip_id: int, 
     image_attachment, image_err = resolve_image_attachment(db, episode, image_source)
     if image_source and image_err:
         return {"ok": False, "error": image_err}
+    _, thumbnail_err = resolve_image_attachment(db, episode, thumbnail_source)
+    if thumbnail_source and thumbnail_err:
+        return {"ok": False, "error": thumbnail_err}
     instagram_err = validate_instagram_requirement(platforms, image_attachment, has_video=bool(video_path))
     if instagram_err:
         return {"ok": False, "error": instagram_err}
@@ -253,7 +257,9 @@ async def publish_clip_social(episode_id: int, soundbite_id: int, clip_id: int, 
     return submit_and_track_job(
         db,
         job_type="clip_social_publish",
-        submit_fn=lambda job_id: submit_clip_social_publish(job_id, platforms, mode, scheduled_at, video_source, image_source),
+        submit_fn=lambda job_id: submit_clip_social_publish(
+            job_id, platforms, mode, scheduled_at, video_source, image_source, thumbnail_source
+        ),
         episode_id=episode_id,
         soundbite_id=soundbite_id,
         video_clip_id=clip_id,
