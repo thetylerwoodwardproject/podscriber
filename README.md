@@ -1,8 +1,7 @@
 # Podscriber
 
 Local-only podcast processing app: upload an episode, get a transcript, AI-generated titles/show
-notes/social posts/keywords/chapters, quotable soundbites, and vertical (9:16) audiogram videos —
-then publish or schedule any of it straight to your social accounts via Postiz.
+notes/social posts/keywords/chapters, quotable soundbites, and vertical (9:16) audiogram videos.
 
 ## One-time setup
 
@@ -86,42 +85,14 @@ AI-suggested, SEO-optimized replacement — a title, description, and target key
 Every suggested title, description, and keyword list can be copied with one click to paste into
 your hosting platform or feed editor — Podscriber doesn't publish these back to the feed itself.
 
-## Social publishing (Postiz)
-
-Podscriber can publish or schedule posts directly to your social accounts through
-[Postiz](https://postiz.com) (hosted or self-hosted) — no copy/paste required. Add your Postiz
-instance's **base URL** and **API key** under Settings → Postiz, then:
-
-- From a soundbite's **Edit video** page, use **Publish to Postiz** to post that clip's vertical
-  video (plus its caption and generated YouTube title) to one or more platforms, right away or on
-  a schedule.
-- From an episode's **Social Posts** tab, publish any of the AI-generated per-platform post
-  variants the same way, optionally attaching the full-episode video, a soundbite clip's video, or
-  an uploaded image/video.
-
-Supported platforms: **TikTok, YouTube, X, Instagram, Bluesky, Threads, Facebook.** A few things
-happen automatically so you don't have to think about platform quirks:
-
-- **TikTok** posts go out as a direct, public post (not an unpublished inbox draft), with sensible
-  defaults for duet/stitch/comments and content-disclosure fields.
-- **YouTube** gets a title automatically — the clip's own generated title, or (for an episode post)
-  the episode's selected title.
-- **Instagram** accepts a video-only post — no image required — and Podscriber auto-detects
-  whether you've connected a regular or a "standalone" Instagram integration in Postiz.
-- **X** and **Bluesky** captions are automatically trimmed to fit each platform's character limit
-  (dropping trailing hashtags first) if the generated text runs long.
-- If a platform still rejects a post, the real reason Postiz gave (not just "failed") shows up
-  next to that platform in the publish status, so it's easy to tell what's actually wrong.
-
 ## Notes
 
 - All data (episodes, transcripts, generated content, exported videos) lives under `media/` and
   `podscriber.db` in this project directory. Nothing leaves your machine except calls you explicitly
-  configure — to Claude/OpenAI in Settings, to PodcastIndex.org/OP3.dev if you set up Analytics or
-  Improvements, and to your own Postiz instance if you publish a post — local Whisper and Ollama are
-  fully offline.
-- API keys (including your Postiz API key) are stored unencrypted in `podscriber.db` (this is a
-  single-user local tool — don't share that file).
+  configure — to Claude/OpenAI in Settings, and to PodcastIndex.org/OP3.dev if you set up Analytics
+  or Improvements — local Whisper and Ollama are fully offline.
+- API keys are stored unencrypted in `podscriber.db` (this is a single-user local tool — don't
+  share that file).
 - The PodcastIndex and OP3 Settings fields power the **Analytics** and **Improvements** pages (see
   above) — both are optional and each page degrades to an empty state explaining what to add if
   either is left unconfigured.

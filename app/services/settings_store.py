@@ -23,8 +23,6 @@ DEFAULTS = {
     "transcription_provider": "local",  # local|openai
     "local_whisper_model_size": "small",
     "custom_instructions": "",  # applied to every AI generation step: titles, description, social, soundbites, chapters
-    "postiz_base_url": "",  # e.g. https://postiz.example.com — self-hosted Postiz instance
-    "postiz_api_key": "",
 }
 
 

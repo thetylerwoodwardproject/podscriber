@@ -1,57 +1,18 @@
-{% for grp in (content.social_posts if content else []) %}
-{% set group_index = loop.index0 %}
-<div style="margin-bottom:30px">
-  <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">
-    <span style="width:26px;height:26px;border-radius:50%;background:{{ grp.color }};color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ grp.initial }}</span>
-    <span style="font-weight:600;font-size:14.5px">{{ grp.platform }}</span>
-  </div>
-  <div class="social-grid">
-    {% for post in grp.posts %}
-    <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px">
-      <form method="post" action="/episodes/{{ episode.id }}/social/{{ group_index }}/{{ loop.index0 }}/edit" data-ajax data-ajax-flash-target="textarea">
-        <textarea name="text" rows="6" onchange="this.form.requestSubmit()" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.55;background:var(--faint)">{{ post }}</textarea>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
-          <span style="font-size:12px;color:var(--muted-light)">{{ post | length }} chars</span>
-        </div>
-      </form>
-      {% if postiz_configured and grp.platform_key %}
-      <div class="social-publish-row" style="display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--border);padding-top:10px">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <select class="social-publish-mode compact-field">
-            <option value="now">Post now</option>
-            <option value="scheduled">Schedule…</option>
-          </select>
-          <input type="datetime-local" class="social-publish-datetime compact-field" style="display:none">
-        </div>
-        <div class="attachment-row">
-          <select class="social-video-source compact-field attachment-select">
-            <option value="">No video</option>
-            {% for opt in video_options %}
-            <option value="{{ opt.value }}" data-url="{{ opt.url }}">{{ opt.label }}</option>
-            {% endfor %}
-            <option value="__upload_video__">Upload a video…</option>
-          </select>
-          <div class="attachment-preview social-video-preview"></div>
-        </div>
-        <div class="attachment-row">
-          <select class="social-image-source compact-field attachment-select">
-            <option value="">No image</option>
-            <option value="__upload_image__">Upload an image…</option>
-          </select>
-          <div class="attachment-preview social-image-preview"></div>
-        </div>
-        <div class="social-attachment-note" style="font-size:11.5px;color:var(--warn,#c2410c);display:none"></div>
-        {% set pub = latest_publish_by_post.get(group_index ~ ":" ~ loop.index0 ~ ":" ~ grp.platform_key) %}
-        <div style="display:flex;align-items:center;gap:10px">
-          <button type="button" class="btn btn-outline social-publish-btn" data-group-index="{{ group_index }}" data-post-index="{{ loop.index0 }}" data-platform="{{ grp.platform_key }}" style="padding:5px 10px;font-size:12px">Publish to {{ grp.platform }}</button>
-          <span class="social-publish-status" style="font-size:11.5px;color:var(--muted-light)">{{ pub | social_publish_status_label }}</span>
-        </div>
+<div class="social-grid">
+  {% for post in (content.social_posts if content else []) %}
+  <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px">
+    <form method="post" action="/episodes/{{ episode.id }}/social/{{ loop.index0 }}/edit" data-ajax data-ajax-flash-target="textarea">
+      <textarea name="text" rows="6" maxlength="280" onchange="this.form.requestSubmit()" style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.55;background:var(--faint)">{{ post.text }}</textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <span style="font-size:12px;color:var(--muted-light)">{{ post.text | length }} / 280 chars</span>
       </div>
-      {% endif %}
-    </div>
-    {% endfor %}
+    </form>
+    <form method="post" action="/episodes/{{ episode.id }}/social/{{ loop.index0 }}/hashtags/edit" data-ajax data-ajax-flash-target="input">
+      <label class="field-label" style="margin-top:0;font-size:11px">Hashtags</label>
+      <input type="text" name="hashtags" value="{{ post.hashtags | join(' ') }}" onchange="this.form.requestSubmit()" placeholder="#podcast #topic #guest" style="width:100%">
+    </form>
   </div>
+  {% else %}
+  <div class="empty-state">No social posts generated.</div>
+  {% endfor %}
 </div>
-{% else %}
-<div class="empty-state">No social posts generated.</div>
-{% endfor %}

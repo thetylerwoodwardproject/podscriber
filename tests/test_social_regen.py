@@ -1,5 +1,5 @@
 from app.services import social_regen
-from app.services.llm.base import SocialGroup
+from app.services.llm.base import SocialPost
 
 
 def _make_episode(db):
@@ -28,7 +28,11 @@ def _make_job(db, episode_id):
 
 class _FakeProvider:
     def generate_social_posts(self, transcript_text, description, tone="casual"):
-        return [SocialGroup(platform="X", initial="X", color="#111", platform_key="x", posts=["p1", "p2", "p3", "p4"])]
+        return [
+            SocialPost(text="p1", hashtags=["#a", "#b", "#c"]),
+            SocialPost(text="p2", hashtags=["#a", "#b", "#c"]),
+            SocialPost(text="p3", hashtags=["#a", "#b", "#c"]),
+        ]
 
 
 class _FailingProvider:
@@ -49,7 +53,9 @@ def test_run_social_regenerate_success(db, monkeypatch):
 
     assert job.status == "done"
     assert episode.generated_content.social_posts == [
-        {"platform": "X", "initial": "X", "color": "#111", "platform_key": "x", "posts": ["p1", "p2", "p3", "p4"]}
+        {"text": "p1", "hashtags": ["#a", "#b", "#c"]},
+        {"text": "p2", "hashtags": ["#a", "#b", "#c"]},
+        {"text": "p3", "hashtags": ["#a", "#b", "#c"]},
     ]
     assert episode.status == "processed"  # unaffected by regeneration
 

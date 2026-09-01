@@ -43,10 +43,6 @@ class Episode(TimestampMixin, Base):
     video: Mapped["EpisodeVideo | None"] = relationship(
         back_populates="episode", uselist=False, cascade="all, delete-orphan"
     )
-    social_publishes: Mapped[list["SocialPublish"]] = relationship(back_populates="episode", cascade="all, delete-orphan")
-    social_attachments: Mapped[list["SocialAttachment"]] = relationship(
-        back_populates="episode", cascade="all, delete-orphan"
-    )
 
 
 class Job(TimestampMixin, Base):
@@ -71,7 +67,6 @@ class Job(TimestampMixin, Base):
     episode: Mapped["Episode | None"] = relationship(back_populates="jobs")
     soundbite: Mapped["Soundbite | None"] = relationship()
     video_clip: Mapped["VideoClip | None"] = relationship()
-    social_publishes: Mapped[list["SocialPublish"]] = relationship(back_populates="job")
 
 
 class Transcript(TimestampMixin, Base):
@@ -112,7 +107,7 @@ class GeneratedContent(Base):
     selected_title_index: Mapped[int] = mapped_column(Integer, default=0)
     description: Mapped[str] = mapped_column(Text, default="")
     keywords: Mapped[list] = mapped_column(JSON, default=list)  # [str]
-    social_posts: Mapped[list] = mapped_column(JSON, default=list)  # [{platform, initial, color, posts:[str]}]
+    social_posts: Mapped[list] = mapped_column(JSON, default=list)  # [{text, hashtags:[str]}]
     llm_provider: Mapped[str] = mapped_column(String, default="")
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=now_utc)
 
@@ -159,47 +154,6 @@ class VideoClip(Base):
     exported_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     soundbite: Mapped["Soundbite"] = relationship(back_populates="video_clips")
-    publishes: Mapped[list["SocialPublish"]] = relationship(back_populates="video_clip", cascade="all, delete-orphan")
-
-
-class SocialPublish(TimestampMixin, Base):
-    __tablename__ = "social_publishes"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    # Exactly one of video_clip_id/episode_id is set, depending on whether this publish came
-    # from the per-soundbite video-clip editor or the episode's main Social Posts tab.
-    video_clip_id: Mapped[int | None] = mapped_column(ForeignKey("video_clips.id"), nullable=True)
-    episode_id: Mapped[int | None] = mapped_column(ForeignKey("episodes.id"), nullable=True)
-    job_id: Mapped[int | None] = mapped_column(ForeignKey("jobs.id"), nullable=True)
-    # Set only for episode-level publishes, where GeneratedContent.social_posts can hold several
-    # posts per platform — disambiguates which specific post this row belongs to. Always None for
-    # clip-level rows, where video_clip_id already uniquely identifies the one post per clip.
-    group_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    post_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    platform: Mapped[str] = mapped_column(String)  # tiktok|youtube|x|instagram|bluesky|threads|facebook
-    postiz_post_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    status: Mapped[str] = mapped_column(String, default="pending")  # pending|done|error
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    video_clip: Mapped["VideoClip | None"] = relationship(back_populates="publishes")
-    episode: Mapped["Episode | None"] = relationship(back_populates="social_publishes")
-    job: Mapped["Job | None"] = relationship(back_populates="social_publishes")
-
-
-class SocialAttachment(TimestampMixin, Base):
-    __tablename__ = "social_attachments"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    episode_id: Mapped[int] = mapped_column(ForeignKey("episodes.id"))
-    kind: Mapped[str] = mapped_column(String)  # video|image
-    file_path: Mapped[str] = mapped_column(String)
-    original_filename: Mapped[str] = mapped_column(String, default="")
-    content_type: Mapped[str] = mapped_column(String, default="")
-    width: Mapped[int | None] = mapped_column(Integer, nullable=True)  # images only
-    height: Mapped[int | None] = mapped_column(Integer, nullable=True)  # images only
-
-    episode: Mapped["Episode"] = relationship(back_populates="social_attachments")
 
 
 class EpisodeVideo(Base):

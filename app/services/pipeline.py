@@ -196,17 +196,8 @@ def run_episode_processing(job_id: int) -> None:
         # --- Step 4: social posts ---
         if "social" in steps:
             _set_step(job, "social", db)
-            social_groups = llm.generate_social_posts(transcript_text, content.description)
-            content.social_posts = [
-                {
-                    "platform": g.platform,
-                    "initial": g.initial,
-                    "color": g.color,
-                    "platform_key": g.platform_key,
-                    "posts": g.posts,
-                }
-                for g in social_groups
-            ]
+            social_posts = llm.generate_social_posts(transcript_text, content.description)
+            content.social_posts = [{"text": p.text, "hashtags": p.hashtags} for p in social_posts]
             db.commit()
 
         # --- Step 5: soundbites ---

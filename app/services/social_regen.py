@@ -16,18 +16,9 @@ def run_social_regenerate(job_id: int, tone: str = "casual") -> None:
             llm = get_llm_provider(db)
             transcript_text = episode.transcript.full_text if episode.transcript else ""
             description = episode.generated_content.description if episode.generated_content else ""
-            social_groups = llm.generate_social_posts(transcript_text, description, tone=tone)
+            social_posts = llm.generate_social_posts(transcript_text, description, tone=tone)
             if episode.generated_content:
-                episode.generated_content.social_posts = [
-                    {
-                        "platform": g.platform,
-                        "initial": g.initial,
-                        "color": g.color,
-                        "platform_key": g.platform_key,
-                        "posts": g.posts,
-                    }
-                    for g in social_groups
-                ]
+                episode.generated_content.social_posts = [{"text": p.text, "hashtags": p.hashtags} for p in social_posts]
 
         run_regenerate(
             db, job_id, fetch_parent=_fetch_episode, apply_result=apply_result, not_found_message="Episode not found."

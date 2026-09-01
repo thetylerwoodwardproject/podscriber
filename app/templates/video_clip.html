@@ -36,7 +36,7 @@
   <div style="flex:1;min-width:260px;max-width:380px;display:flex;flex-direction:column;gap:24px">
     {% set target = clip %}
     {% set show_clip_social = true %}
-    {% set export_label = "Export vertical video" %}
+    {% set export_label = "Generate Video" %}
     {% set filename_placeholder = "soundbite-" ~ soundbite.id %}
     {% set download_url = "/episodes/" ~ episode.id ~ "/soundbites/" ~ soundbite.id ~ "/video/" ~ clip.id ~ "/download" %}
     {% include "_video_editor_controls.html" %}

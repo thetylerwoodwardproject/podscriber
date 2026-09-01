@@ -33,6 +33,29 @@ def test_social_posts_prompt_no_custom_instructions_by_default():
     assert "casual" in system.lower()
 
 
+def test_social_posts_prompt_instructs_exactly_three_posts_under_280_chars():
+    system, user, schema = prompts.social_posts_prompt("t", "d")
+    assert "exactly 3" in user.lower()
+    assert "280" in system
+    assert schema["properties"]["posts"]["items"]["properties"]["text"]["maxLength"] == 280
+    # Claude's structured-output API rejects array minItems/maxItems other than 0 or 1, so the
+    # post/hashtag counts must not be enforced via the schema — only via prompt text + code.
+    assert "minItems" not in schema["properties"]["posts"]
+    assert "maxItems" not in schema["properties"]["posts"]
+
+
+def test_social_posts_prompt_instructs_three_to_four_hashtags():
+    system, user, _ = prompts.social_posts_prompt("t", "d")
+    assert "3-4" in user or "3 - 4" in user
+
+
+def test_clip_social_prompt_states_280_char_limit():
+    system, user, schema = prompts.clip_social_prompt("quote text", "Episode Title")
+    assert "280" in system
+    assert "280" in user
+    assert schema["properties"]["social_post"]["maxLength"] == 280
+
+
 def test_titles_prompt_custom_instructions_included_verbatim():
     system, _, _ = prompts.titles_prompt("t", custom_instructions="Always mention the guest's name.")
     assert "Always mention the guest's name." in system

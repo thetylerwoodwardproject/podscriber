@@ -83,32 +83,6 @@ def submit_clip_social_regenerate(job_id: int) -> None:
     submit_job(job_id, run_clip_social_regenerate, guarded=False)
 
 
-def submit_clip_social_publish(
-    job_id: int,
-    platforms: list[str],
-    mode: str,
-    scheduled_at: str | None,
-    video_source: dict | None,
-    image_source: dict | None,
-    thumbnail_source: dict | None,
-) -> None:
-    from app.services.clip_social_publish import run_clip_social_publish
-
-    # guarded=False, same reasoning as submit_social_regenerate: a failed publish attempt
-    # shouldn't flip the whole episode to "error" — per-platform failures are recorded on
-    # SocialPublish rows, and run_clip_social_publish handles its own job-level reporting.
-    submit_job(
-        job_id, run_clip_social_publish, platforms, mode, scheduled_at, video_source, image_source, thumbnail_source, guarded=False
-    )
-
-
-def submit_episode_social_publish(job_id: int, selections: list[dict], mode: str, scheduled_at: str | None) -> None:
-    from app.services.episode_social_publish import run_episode_social_publish
-
-    # guarded=False, same reasoning as submit_clip_social_publish.
-    submit_job(job_id, run_episode_social_publish, selections, mode, scheduled_at, guarded=False)
-
-
 def submit_feed_seo_bulk(job_id: int) -> None:
     from app.services.feed_seo import run_feed_seo_bulk
 

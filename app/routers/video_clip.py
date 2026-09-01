@@ -7,15 +7,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import Episode, Job, Soundbite, VideoClip
 from app.routers._shared import export_status_stream, latest_job, recent_episodes, sse_job_stream, submit_and_track_job
-from app.services import settings_store
-from app.services.jobs import submit_clip_social_publish, submit_clip_social_regenerate, submit_video_export
-from app.services.postiz import PLATFORMS
-from app.services.social_attachments import (
-    episode_video_options,
-    resolve_image_attachment,
-    resolve_video_source,
-    validate_instagram_requirement,
-)
+from app.services.jobs import submit_clip_social_regenerate, submit_video_export
 from app.services.video_editor_shared import apply_clip_settings, download_response, save_clip_image
 from app.services.waveform import amplitude_envelope
 from app.templating import templates
@@ -75,10 +67,6 @@ def video_editor_page(episode_id: int, soundbite_id: int, clip_id: int, request:
 
     swatches = ["#e2572c", "#0f8a6c", "#5b5bd6", "#c2410c", "#ffffff", "#c0ff00"]
 
-    latest_publish_by_platform = {}
-    for pub in sorted(clip.publishes, key=lambda p: p.created_at):
-        latest_publish_by_platform[pub.platform] = pub
-
     return templates.TemplateResponse(
         request,
         "video_clip.html",
@@ -90,10 +78,6 @@ def video_editor_page(episode_id: int, soundbite_id: int, clip_id: int, request:
             "clip": clip,
             "envelope_json": json.dumps(envelope),
             "swatches": swatches,
-            "publish_platforms": PLATFORMS,
-            "postiz_configured": bool(settings_store.get(db, "postiz_base_url") and settings_store.get(db, "postiz_api_key")),
-            "latest_publish_by_platform": latest_publish_by_platform,
-            "video_options": episode_video_options(episode),
             "clip_index": soundbite.video_clips.index(clip) + 1,
             "clip_count": len(soundbite.video_clips),
         },
@@ -168,7 +152,7 @@ async def update_clip_settings(episode_id: int, soundbite_id: int, clip_id: int,
     body = await request.json()
     apply_clip_settings(clip, body, waveform_offset_range=(-380, 60))
     if "social_post" in body:
-        clip.social_post = str(body["social_post"])[:2200]
+        clip.social_post = str(body["social_post"])[:280]
     if "youtube_title" in body:
         clip.youtube_title = str(body["youtube_title"])[:99]
     db.commit()
@@ -224,73 +208,6 @@ def video_status_stream(episode_id: int, soundbite_id: int, clip_id: int):
 def download_video(episode_id: int, soundbite_id: int, clip_id: int, db: Session = Depends(get_db)):
     clip = _get_clip_or_404(db, soundbite_id, clip_id)
     return download_response(clip, fallback_stem=f"soundbite-{soundbite_id}-{clip_id}")
-
-
-@router.post("/episodes/{episode_id}/soundbites/{soundbite_id}/video/{clip_id}/social/publish")
-async def publish_clip_social(episode_id: int, soundbite_id: int, clip_id: int, request: Request, db: Session = Depends(get_db)):
-    episode = db.get(Episode, episode_id)
-    body = await request.json()
-    platforms = [p for p in body.get("platforms", []) if p in PLATFORMS]
-    mode = "scheduled" if body.get("mode") == "scheduled" else "now"
-    scheduled_at = str(body["scheduled_at"]) if mode == "scheduled" and body.get("scheduled_at") else None
-    video_source = body.get("video_source") if isinstance(body.get("video_source"), dict) else None
-    image_source = body.get("image_source") if isinstance(body.get("image_source"), dict) else None
-    thumbnail_source = body.get("thumbnail_source") if isinstance(body.get("thumbnail_source"), dict) else None
-
-    if not platforms or (mode == "scheduled" and not scheduled_at):
-        return {"ok": False, "error": "Select at least one platform (and a date/time, if scheduling)."}
-    if not video_source:
-        return {"ok": False, "error": "Pick a video to attach."}
-    video_path, video_err = resolve_video_source(db, episode, video_source)
-    if video_err:
-        return {"ok": False, "error": video_err}
-    image_attachment, image_err = resolve_image_attachment(db, episode, image_source)
-    if image_source and image_err:
-        return {"ok": False, "error": image_err}
-    _, thumbnail_err = resolve_image_attachment(db, episode, thumbnail_source)
-    if thumbnail_source and thumbnail_err:
-        return {"ok": False, "error": thumbnail_err}
-    instagram_err = validate_instagram_requirement(platforms, image_attachment, has_video=bool(video_path))
-    if instagram_err:
-        return {"ok": False, "error": instagram_err}
-
-    return submit_and_track_job(
-        db,
-        job_type="clip_social_publish",
-        submit_fn=lambda job_id: submit_clip_social_publish(
-            job_id, platforms, mode, scheduled_at, video_source, image_source, thumbnail_source
-        ),
-        episode_id=episode_id,
-        soundbite_id=soundbite_id,
-        video_clip_id=clip_id,
-    )
-
-
-@router.get("/episodes/{episode_id}/soundbites/{soundbite_id}/video/{clip_id}/social/publish/status/stream")
-def clip_social_publish_status_stream(episode_id: int, soundbite_id: int, clip_id: int):
-    def payload_fn(job: Job) -> dict:
-        payload = {"status": job.status, "error_message": job.error_message}
-        if job.status in ("done", "error"):
-            payload["publishes"] = [
-                {
-                    "platform": pub.platform,
-                    "status": pub.status,
-                    "error_message": pub.error_message,
-                    "postiz_post_id": pub.postiz_post_id,
-                    "scheduled_at": pub.scheduled_at.isoformat() if pub.scheduled_at else None,
-                }
-                # Filtered to this run's own job_id — a "latest per platform of all time" read
-                # would show a stale prior success while the current run is still uploading or
-                # fails before writing any per-platform rows.
-                for pub in job.social_publishes
-            ]
-        return payload
-
-    return sse_job_stream(
-        query_fn=lambda db: latest_job(db, "clip_social_publish", video_clip_id=clip_id),
-        payload_fn=payload_fn,
-        not_found_payload={"status": "pending"},
-    )
 
 
 @router.post("/episodes/{episode_id}/soundbites/video/export-selected")

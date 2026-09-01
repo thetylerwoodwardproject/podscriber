@@ -10,13 +10,33 @@ class TitleCandidate:
     score: int
 
 
+SOCIAL_POST_MAX_CHARS = 280
+SOCIAL_POST_MAX_HASHTAGS = 4
+
+
+def _normalize_hashtags(tags: list[str]) -> list[str]:
+    """Strips whitespace, drops empties, ensures a leading '#', and caps at
+    `SOCIAL_POST_MAX_HASHTAGS` — a model can return too many, or omit the '#', so this is
+    enforced in code rather than trusted from the prompt."""
+    normalized = []
+    for tag in tags:
+        tag = tag.strip().replace(" ", "")
+        if not tag.lstrip("#"):
+            continue
+        if not tag.startswith("#"):
+            tag = f"#{tag}"
+        normalized.append(tag)
+    return normalized[:SOCIAL_POST_MAX_HASHTAGS]
+
+
 @dataclass
-class SocialGroup:
-    platform: str
-    initial: str
-    color: str
-    platform_key: str = ""  # lowercase Postiz integration key, e.g. "x", "youtube"
-    posts: list[str] = field(default_factory=list)
+class SocialPost:
+    text: str
+    hashtags: list[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        self.text = _clamp_text(self.text, max_chars=SOCIAL_POST_MAX_CHARS)
+        self.hashtags = _normalize_hashtags(self.hashtags)
 
 
 @dataclass
@@ -42,7 +62,8 @@ class ClipSocial:
     youtube_title: str
 
     def __post_init__(self):
-        self.youtube_title = _clamp_title(self.youtube_title, max_chars=99)
+        self.social_post = _clamp_text(self.social_post, max_chars=SOCIAL_POST_MAX_CHARS)
+        self.youtube_title = _clamp_text(self.youtube_title, max_chars=99)
         if not self.social_post.strip() or not self.youtube_title.strip():
             # A model can return a schema-valid but empty response under load (seen with a
             # large local Ollama model taking several minutes and coming back blank) — treat
@@ -53,13 +74,13 @@ class ClipSocial:
 SEO_TITLE_MAX_CHARS = 60
 
 
-def _clamp_title(title: str, max_chars: int = SEO_TITLE_MAX_CHARS) -> str:
-    """Enforces the podcast-app title-truncation limit even if a model ignores the prompt's
-    character-count instruction (smaller local models especially aren't reliable about it)."""
-    title = title.strip()
-    if len(title) <= max_chars:
-        return title
-    truncated = title[:max_chars]
+def _clamp_text(text: str, max_chars: int = SEO_TITLE_MAX_CHARS) -> str:
+    """Enforces a length limit even if a model ignores the prompt's character-count
+    instruction (smaller local models especially aren't reliable about it)."""
+    text = text.strip()
+    if len(text) <= max_chars:
+        return text
+    truncated = text[:max_chars]
     if " " in truncated:
         truncated = truncated.rsplit(" ", 1)[0]
     return truncated.rstrip(" -–—,;:")
@@ -72,26 +93,13 @@ class SeoSuggestion:
     keywords: list[str] = field(default_factory=list)
 
     def __post_init__(self):
-        self.title = _clamp_title(self.title)
-
-
-# (display_name, initial, color, postiz_key) — postiz_key matches app.services.postiz.PLATFORMS,
-# so a generated post can be published without a separate name-normalization step.
-SOCIAL_PLATFORMS = [
-    ("X", "X", "#111111", "x"),
-    ("Instagram", "IG", "#c2185b", "instagram"),
-    ("Threads", "T", "#3a352c", "threads"),
-    ("TikTok", "TT", "#000000", "tiktok"),
-    ("YouTube", "YT", "#ff0000", "youtube"),
-    ("Bluesky", "BS", "#1185fe", "bluesky"),
-    ("Facebook", "FB", "#1877f2", "facebook"),
-]
+        self.title = _clamp_text(self.title)
 
 
 class LLMProvider(Protocol):
     def generate_titles(self, transcript_text: str) -> list[TitleCandidate]: ...
     def generate_description_and_keywords(self, transcript_text: str) -> DescriptionAndKeywords: ...
-    def generate_social_posts(self, transcript_text: str, description: str, tone: str = "casual") -> list[SocialGroup]: ...
+    def generate_social_posts(self, transcript_text: str, description: str, tone: str = "casual") -> list[SocialPost]: ...
     def select_soundbites(self, transcript_text: str) -> list[SoundbiteCandidate]: ...
     def generate_clip_social(self, quote: str, episode_title: str) -> ClipSocial: ...
     def generate_chapters(self, transcript_text: str) -> list[ChapterCandidate]: ...
@@ -120,13 +128,13 @@ class BaseLLMProvider:
         data = self._call(system, user, schema)
         return DescriptionAndKeywords(description=data["description"], keywords=data["keywords"])
 
-    def generate_social_posts(self, transcript_text: str, description: str, tone: str = "casual") -> list[SocialGroup]:
+    def generate_social_posts(self, transcript_text: str, description: str, tone: str = "casual") -> list[SocialPost]:
         system, user, schema = prompts.social_posts_prompt(transcript_text, description, tone, self.custom_instructions)
         data = self._call(system, user, schema)
-        return [
-            SocialGroup(platform=name, initial=initial, color=color, platform_key=key, posts=data[f"{key}_posts"])
-            for name, initial, color, key in SOCIAL_PLATFORMS
-        ]
+        # The schema can't enforce "exactly 3" (Claude's structured-output API rejects array
+        # minItems/maxItems other than 0 or 1), so cap defensively here in case a model returns
+        # more than asked for.
+        return [SocialPost(text=p["text"], hashtags=p.get("hashtags", [])) for p in data["posts"][:3]]
 
     def select_soundbites(self, transcript_text: str) -> list[SoundbiteCandidate]:
         system, user, schema = prompts.soundbites_prompt(transcript_text, self.custom_instructions)

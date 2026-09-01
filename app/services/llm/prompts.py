@@ -169,40 +169,41 @@ def social_posts_prompt(
 ) -> tuple[str, str, dict]:
     tone_line = TONE_GUIDANCE.get(tone, TONE_GUIDANCE["casual"])
     system = (
-        "You write social media posts promoting a podcast episode, tailored to each platform's "
-        "tone: X (formerly Twitter) is terse and punchy, Instagram is warmer with emoji, "
-        "Threads is conversational and informal, TikTok is short and punchy with trending-style "
-        "hashtags, YouTube reads like a community post or video description inviting people to "
-        "watch, Bluesky is conversational like X but without character-limit pressure, and "
-        "Facebook is warmer and longer-form, often posing a question to invite comments. " + tone_line
+        "You write short, platform-neutral social media posts promoting a podcast episode — "
+        "copy that works as-is on any network (X, Instagram, Threads, Facebook, LinkedIn, etc.) "
+        "without platform-specific formatting or references. Each post must be 280 characters or "
+        "fewer. " + tone_line
     )
     system = _with_custom_instructions(system, custom_instructions)
     user = (
         f"Episode transcript excerpt:\n\n{_truncated(transcript_text)}\n\n"
         f"Show notes:\n{description}\n\n"
-        "Write exactly 4 distinct post variants for each of X, Instagram, Threads, TikTok, "
-        "YouTube, Bluesky, and Facebook promoting this episode."
+        "Write exactly 3 distinct posts promoting this episode, each 280 characters or fewer. "
+        "For each post, also suggest 3-4 relevant hashtags (without the '#')."
     )
+    # No minItems/maxItems on the arrays below: Claude's structured-output API rejects array
+    # bounds other than 0 or 1 (`output_config.format.schema: For 'array' type, 'minItems'
+    # values other than 0 or 1 are not supported`), so "exactly 3 posts" / "3-4 hashtags" is
+    # enforced by the prompt text plus defensive clamping in `SocialPost.__post_init__`
+    # instead of the schema — same approach already used for title/soundbite/chapter counts
+    # elsewhere in this file.
     schema = {
         "type": "object",
         "properties": {
-            "x_posts": {"type": "array", "items": {"type": "string"}},
-            "instagram_posts": {"type": "array", "items": {"type": "string"}},
-            "threads_posts": {"type": "array", "items": {"type": "string"}},
-            "tiktok_posts": {"type": "array", "items": {"type": "string"}},
-            "youtube_posts": {"type": "array", "items": {"type": "string"}},
-            "bluesky_posts": {"type": "array", "items": {"type": "string"}},
-            "facebook_posts": {"type": "array", "items": {"type": "string"}},
+            "posts": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "maxLength": 280},
+                        "hashtags": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["text", "hashtags"],
+                    "additionalProperties": False,
+                },
+            }
         },
-        "required": [
-            "x_posts",
-            "instagram_posts",
-            "threads_posts",
-            "tiktok_posts",
-            "youtube_posts",
-            "bluesky_posts",
-            "facebook_posts",
-        ],
+        "required": ["posts"],
         "additionalProperties": False,
     }
     return system, user, schema
@@ -246,20 +247,22 @@ def clip_social_prompt(quote: str, episode_title: str, custom_instructions: str 
         "You write the caption for a short vertical video clip (a podcast soundbite) that will be "
         "posted as both a YouTube Short and a TikTok — write one post whose text works unchanged on "
         "both platforms. Lead with a hook, keep it tight, and end with several relevant hashtags "
-        "(mix of broad and specific, no spaces inside a hashtag, no more than about 8). Also write a "
-        "short, punchy YouTube Shorts title under 100 characters that captures the hook of the clip. "
-        "Never use an em dash (—) or en dash (–)."
+        "(mix of broad and specific, no spaces inside a hashtag, no more than about 8). The whole "
+        "post, hashtags included, must be 280 characters or fewer. Also write a short, punchy "
+        "YouTube Shorts title under 100 characters that captures the hook of the clip. Never use an "
+        "em dash (—) or en dash (–)."
     )
     system = _with_custom_instructions(system, custom_instructions)
     user = (
         f"Podcast episode: {episode_title}\n\n"
         f"Clip transcript (verbatim):\n{quote}\n\n"
-        "Write the social post text (with hashtags) and the YouTube title for this clip."
+        "Write the social post text (with hashtags, 280 characters or fewer) and the YouTube title "
+        "for this clip."
     )
     schema = {
         "type": "object",
         "properties": {
-            "social_post": {"type": "string"},
+            "social_post": {"type": "string", "maxLength": 280},
             "youtube_title": {"type": "string"},
         },
         "required": ["social_post", "youtube_title"],

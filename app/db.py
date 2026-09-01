@@ -41,14 +41,6 @@ class Base(DeclarativeBase):
 def init_db() -> None:
     from app import models  # noqa: F401  (register models on Base.metadata)
 
-    # social_publishes shipped in two steps within the same unreleased feature: first with
-    # video_clip_id NOT NULL and no episode_id/job_id, then widened to also support
-    # episode-level publishes. create_all() never alters an existing table, so an install that
-    # already created the table under the old shape would keep failing on "no such column:
-    # social_publishes.episode_id" (and later, a NOT NULL violation on video_clip_id) forever.
-    # The table had no real usage under the old shape, so drop-and-let-create_all-rebuild is
-    # safe here — this is a one-time reset, not a pattern to repeat for tables with real data.
-    _reset_table_if_missing_column("social_publishes", "episode_id")
     _rename_table_if_unique_column("video_clips", "soundbite_id", "video_clips_pre_multi")
 
     Base.metadata.create_all(bind=engine)
@@ -64,20 +56,6 @@ def init_db() -> None:
     _drop_column_if_exists("video_clips", "caption")
     _add_column_if_missing("jobs", "video_clip_id", "INTEGER REFERENCES video_clips(id)")
     _copy_rows_and_drop("video_clips_pre_multi", "video_clips")
-    _add_column_if_missing("social_publishes", "group_index", "INTEGER")
-    _add_column_if_missing("social_publishes", "post_index", "INTEGER")
-
-
-def _reset_table_if_missing_column(table: str, required_column: str) -> None:
-    with engine.begin() as conn:
-        tables = {
-            row[0] for row in conn.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,))
-        }
-        if table not in tables:
-            return
-        existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
-        if required_column not in existing:
-            conn.exec_driver_sql(f"DROP TABLE {table}")
 
 
 def _rename_table_if_unique_column(table: str, column: str, rename_to: str) -> None:
